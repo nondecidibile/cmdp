@@ -44,23 +44,17 @@ class GpomdpLearner:
 		
 		for j in range(maxEpLength):
 
-			# Take only episodes longer than j
-			episodes_mask = np.greater(epLength, np.full(len(epLength),fill_value=j) )
-			episodes = (np.asarray(data))[episodes_mask]
+			episodes = (np.asarray(data))
 			
 			num = np.zeros(shape=self.policy.nFeatures, dtype=np.float32)
 			den = np.zeros(shape=self.policy.nFeatures, dtype=np.float32)
 
 			for n,ep in enumerate(episodes):
 				
-				log_g2 = np.zeros(shape=self.policy.nFeatures, dtype=np.float32)
-				for t in range(0,j+1):
-					log_g2 += logGradients[n,t]
-				
 				log_g = np.sum(logGradients[n,0:j+1],axis=0)
 				square_log_g = log_g ** 2
 
-				num += square_log_g * ep["r"][j]
+				num += square_log_g * (ep["r"][j] if len(ep["r"])>j else 0)
 				den += square_log_g
 
 			baseline[j] = np.divide(num,den+1e-09)

@@ -98,7 +98,7 @@ class BoltzmannPolicy:
 			self.params = self.params + update_step
 			
 			update_size = np.linalg.norm(np.ravel(np.asarray(update_step)),2)
-			# print(update_size)
+			print(steps," - Update size :",update_size)
 			steps += 1
 			if update_size<epsilon or steps>maxSteps:
 				flag = False

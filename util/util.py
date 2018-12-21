@@ -37,7 +37,7 @@ def build_taxi_features(mdp,observation):
 	return state_features
 
 
-def build_gridworld_features(mdp,observation):
+def build_gridworld_features(mdp,observation,stateFeaturesMask=None):
 
 	lst = list(mdp.decode(observation))
 	row, col, row_g, col_g = lst[0], lst[1], lst[2], lst[3]
@@ -51,10 +51,15 @@ def build_gridworld_features(mdp,observation):
 	state_features += onehot_encode(row_g,4)
 	state_features += onehot_encode(col_g,4)
 
-	return state_features
+	if stateFeaturesMask is None:
+		return state_features
+	else:
+		state_features = np.array(state_features)
+		mask = np.array(stateFeaturesMask, dtype=bool)
+		return state_features[mask]
 
 
-def collect_gridworld_episode(mdp,policy,horizon,render=False):
+def collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
 
 	states = []
 	actions = []
@@ -70,16 +75,19 @@ def collect_gridworld_episode(mdp,policy,horizon,render=False):
 
 		length += 1
 
-		state_features = build_gridworld_features(mdp,state)
+		state_features = build_gridworld_features(mdp,state,stateFeaturesMask)
 		action = policy.draw_action(state_features)
+
+		if exportAllStateFeatures is True:
+			state_features = build_gridworld_features(mdp,state)
 
 		newstate, reward, done, _ = mdp.step(action)
 		states.append(state_features)
 		actions.append(action)
 		if done:
-			rewards.append(0)
+			rewards.append(5)
 		else:
-			rewards.append(reward)
+			rewards.append(-1)
 
 		if render:
 			mdp.render()
@@ -96,14 +104,14 @@ def collect_gridworld_episode(mdp,policy,horizon,render=False):
 	return [episode_data,length]
 
 
-def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,render=False):
+def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
 	
 	data = []
 
 	mean_length = 0
 
 	for i in range(num_episodes):
-		episode_data, length = collect_gridworld_episode(mdp,policy,horizon,render)
+		episode_data, length = collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask,exportAllStateFeatures,render)
 		data.append(episode_data)
 		mean_length += length
 	
