@@ -8,10 +8,12 @@ class GpomdpLearner:
 	G(PO)MDP algorithm with baseline
 	"""
 
-	def __init__(self, mdp, nStateFeatures, nActions):
+	def __init__(self, mdp, nStateFeatures, nActions, gamma=0.99):
 
 		self.nStateFeatures = nStateFeatures
 		self.nActions = nActions
+
+		self.gamma = gamma
 
 		self.policy = BoltzmannPolicy(nStateFeatures,nActions)
 
@@ -20,7 +22,7 @@ class GpomdpLearner:
 		return self.policy.draw_action(stateFeatures)
 
 
-	def estimate_gradient(self, data):
+	def estimate_gradient(self, data, getSampleVariance=False):
 
 		"""
 		Compute the gradient of J wrt to the policy params
@@ -54,7 +56,7 @@ class GpomdpLearner:
 				log_g = np.sum(logGradients[n,0:j+1],axis=0)
 				square_log_g = log_g ** 2
 
-				num += square_log_g * (ep["r"][j] if len(ep["r"])>j else 0)
+				num += square_log_g * (np.power(self.gamma,j)*ep["r"][j] if len(ep["r"])>j else 0)
 				den += square_log_g
 
 			baseline[j] = np.divide(num,den+1e-09)
@@ -64,10 +66,10 @@ class GpomdpLearner:
 		#
 
 		gradient = np.zeros(shape=self.policy.paramsShape, dtype=np.float32)
+		grads = np.zeros(shape=np.concatenate([[nEpisodes],self.policy.paramsShape]), dtype=np.float32)
 
 		for n,ep in enumerate(data):
 
-			grad = np.zeros(shape=self.policy.paramsShape, dtype=np.float32)
 			sum_log_grad = np.zeros(shape=self.policy.paramsShape, dtype=np.float32)
 
 			for i in range(ep["a"].size):
@@ -80,9 +82,22 @@ class GpomdpLearner:
 				sum_log_grad = sum_log_grad + log_grad
 				
 				baseln = np.reshape(baseline[i],newshape=self.policy.paramsShape)
-				grad = grad + sum_log_grad * (reward - baseln)
+				grads[n] = grads[n] + sum_log_grad * (np.power(self.gamma,i)*reward - baseln)
 			
-			gradient = gradient + grad
+			gradient = gradient + grads[n]
 		
-		return gradient
+		gradient = gradient/nEpisodes
+		if not getSampleVariance:
+			return gradient
+		
+		#
+		# Compute the sample variance
+		#
+
+		variance = np.zeros(shape=self.policy.paramsShape, dtype=np.float32)
+		for i in range(nEpisodes):
+			variance += np.square(grads[i]-gradient)
+		variance = variance/nEpisodes
+
+		return (gradient,variance)
 	
