@@ -1,6 +1,7 @@
 import numpy as np
 from util.policy import BoltzmannPolicy
 from util.util import build_gridworld_features
+from progress.bar import Bar
 
 class GpomdpLearner:
 
@@ -13,6 +14,7 @@ class GpomdpLearner:
 		self.nStateFeatures = nStateFeatures
 		self.nActions = nActions
 
+		self.mdp = mdp
 		self.gamma = gamma
 
 		self.policy = BoltzmannPolicy(nStateFeatures,nActions)
@@ -22,7 +24,7 @@ class GpomdpLearner:
 		return self.policy.draw_action(stateFeatures)
 
 
-	def estimate_gradient(self, data, getSampleVariance=False):
+	def estimate_gradient(self, data, getSampleVariance=False, showProgress=False):
 
 		"""
 		Compute the gradient of J wrt to the policy params
@@ -32,11 +34,18 @@ class GpomdpLearner:
 		nEpisodes = len(data)
 		epLength = [ep["a"].size for ep in data]
 		maxEpLength = max(epLength)
+
+		if showProgress:
+			bar = Bar('Computing gradient', max=2*len(data))
+
 		logGradients = np.zeros(shape=(nEpisodes,maxEpLength,self.policy.nFeatures))
 		for n,ep in enumerate(data):
 			for i in range(ep["a"].size):
 				g = self.policy.compute_log_gradient(ep["s"][i],ep["a"][i])
+				#print(g[:, -4:])
 				logGradients[n,i] = np.ravel(np.asarray(g))
+			if showProgress:
+				bar.next()
 
 		#
 		# Compute the baseline
@@ -63,7 +72,7 @@ class GpomdpLearner:
 		
 		#
 		# Compute the gradient
-		#
+		#		
 
 		gradient = np.zeros(shape=self.policy.paramsShape, dtype=np.float32)
 		grads = np.zeros(shape=np.concatenate([[nEpisodes],self.policy.paramsShape]), dtype=np.float32)
@@ -82,9 +91,16 @@ class GpomdpLearner:
 				sum_log_grad = sum_log_grad + log_grad
 				
 				baseln = np.reshape(baseline[i],newshape=self.policy.paramsShape)
+				#print(sum_log_grad[:, -4:])
 				grads[n] = grads[n] + sum_log_grad * (np.power(self.gamma,i)*reward - baseln)
 			
 			gradient = gradient + grads[n]
+			
+			if showProgress:
+				bar.next()
+
+		if showProgress:
+			bar.finish()
 		
 		gradient = gradient/nEpisodes
 		if not getSampleVariance:

@@ -33,6 +33,7 @@ class BoltzmannPolicy:
 
 	def draw_action(self, stateFeatures):
 		policy = self.compute_policy(stateFeatures)
+		#print(policy.max())
 		return np.random.choice(self.nActions, p=policy)
 
 
