@@ -36,7 +36,7 @@ class GpomdpLearner:
 		maxEpLength = max(epLength)
 
 		if showProgress:
-			bar = Bar('Computing gradient', max=2*len(data))
+			bar = Bar('Estimating gradient', max=2*len(data))
 
 		logGradients = np.zeros(shape=(nEpisodes,maxEpLength,self.policy.nFeatures))
 		for n,ep in enumerate(data):

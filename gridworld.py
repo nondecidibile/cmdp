@@ -6,8 +6,10 @@ from util.optimizer import *
 from util.policy import *
 from util.util import *
 
+
 mdp = gridworld.GridworldEnv()
 mdp.horizon = 50
+
 
 #
 # Learning without some state features
@@ -27,13 +29,13 @@ learn(
 	plotGradient=True
 )
 
+
 #
 # Policy & gradient estimation
 #
 
-N = 10000
-eps,_ = collect_gridworld_episodes(mdp,learner.policy,N,mdp.horizon,sfMask,showProgress=True)
-
+N = 50000
+#eps,_ = collect_gridworld_episodes(mdp,learner.policy,N,mdp.horizon,sfMask,showProgress=True)
 estimated_learner = GpomdpLearner(mdp,16,4,gamma=0.98)
 
 # Load already estimated parameters
@@ -50,20 +52,19 @@ for a in range(learner.policy.paramsShape[0]):
 # Find params with Maximum Likelihood
 #find_params_ml(estLearner=estimated_learner,saveFile=None)
 
-
-print("Estimating policy gradient...")
+#gradient = np.load("gradient8.npy")
+#gradient_var = np.load("gradient8var.npy")
 gradient,gradient_var = estimated_learner.estimate_gradient(eps,getSampleVariance=True,showProgress=True)
-#print("Gradient\n",gradient,"\n")
+#np.save("gradient8.npy",gradient)
+#np.save("gradient8var.npy",gradient_var)
 
 
 #
 # Hypothesis test
 #
 
-# Number of episodes
-N = len(eps)
 # Confidence level
-delta = 0.3
+delta = 0.2
 
 
 ####### Hoeffding
@@ -105,17 +106,22 @@ print("\nBernstein: ",b_epsilon,"\n")
 
 
 #
-# Test params
+# Test state features
 #
+
+rejected_sf = np.zeros(shape=gradient[0].shape)
 
 for a,gg in enumerate(gradient):
 	print("\n",end='')
 	for s,g in enumerate(gg):
-		rejected = False
+		rejected = 0
 		if not(g+eb_epsilon[a,s]>=0 and g-eb_epsilon[a,s]<=0):
-			rejected = True
+			rejected = 1
+			rejected_sf[s] += 1
 		var = gradient_var[a,s]
 		print("s =",s,"| a =",a,
 		"|| g = ",format(g,".5f"),
 		"| var = ",format(var,".5f"),
-		"| REJECTED = ",rejected)
+		"| rejected =",rejected)
+
+print("\nRejected state features:\n",rejected_sf)
