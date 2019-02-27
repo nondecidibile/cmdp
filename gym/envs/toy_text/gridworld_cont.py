@@ -7,7 +7,7 @@ class GridworldContEnv(gym.Env):
 	def __init__(self):
 
 		self.DIM = 5
-		self.MAX_SPEED = 1
+		self.MAX_SPEED = 2
 		self.END_DISTANCE = 1
 
 		self.max_action = np.array([self.MAX_SPEED,self.MAX_SPEED])
@@ -49,11 +49,19 @@ class GridworldContEnv(gym.Env):
 		dest = np.array([xg,yg],dtype=np.float32)
 		
 		# clip action to max_speed
-		action_norm = np.linalg.norm(action)
-		action = action if action_norm<=self.MAX_SPEED else action*(self.MAX_SPEED/action_norm)
+		#action_norm = np.linalg.norm(action)
+		#action = action if action_norm<=self.MAX_SPEED else action*(self.MAX_SPEED/action_norm)
 
-		x += action[0]
-		y += action[1]
+		dx = action[0]
+		dy = action[1]
+
+		if np.abs(dx) > self.MAX_SPEED:
+			dx = dx/np.abs(dx)
+		if np.abs(dy) > self.MAX_SPEED:
+			dy = dy/np.abs(dy)
+
+		x += dx
+		y += dy
 
 		newstate = np.array([x,y,xg,yg],dtype=np.float32)
 		np.clip(newstate,-self.max_position,self.max_position,newstate)

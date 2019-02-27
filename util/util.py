@@ -56,7 +56,7 @@ def build_gridworld_features(mdp,observation,stateFeaturesMask=None):
 	state_features += onehot_encode(col_g,4)
 
 	if stateFeaturesMask is None:
-		return state_features
+		return np.array(state_features)
 	else:
 		state_features = np.array(state_features)
 		mask = np.array(stateFeaturesMask, dtype=bool)
@@ -65,9 +65,11 @@ def build_gridworld_features(mdp,observation,stateFeaturesMask=None):
 
 def collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
 
-	states = []
-	actions = []
-	rewards = []
+	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
+
+	states = np.zeros(shape=(horizon,nsf),dtype=np.float32)
+	actions = np.zeros(shape=horizon,dtype=np.int32)
+	rewards = np.zeros(shape=horizon,dtype=np.int32)
 
 	state = mdp.reset()
 	if render:
@@ -86,12 +88,13 @@ def collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAl
 			state_features = build_gridworld_features(mdp,state)
 
 		newstate, reward, done, _ = mdp.step(action)
-		states.append(state_features)
-		actions.append(action)
+
+		states[i] = state_features
+		actions[i] = action
 		if done:
-			rewards.append(0)
+			rewards[i] = 0
 		else:
-			rewards.append(-1)
+			rewards[i] = -1
 
 		if render:
 			mdp.render()
@@ -102,15 +105,19 @@ def collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAl
 		
 		state = newstate
 	
-	episode_data = {"s": states,
-			"a": np.array(actions,dtype=np.int32),
-			"r": np.array(rewards,dtype=np.int32)}
+	episode_data = {"s": states,"a": actions,"r": rewards}
 	return [episode_data,length]
 
 
 def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False,showProgress=False):
 	
-	data = []
+	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
+
+	data_s = np.zeros(shape=(num_episodes,horizon,nsf),dtype=np.float32)
+	data_a = np.zeros(shape=(num_episodes,horizon),dtype=np.int32)
+	data_r = np.zeros(shape=(num_episodes,horizon),dtype=np.int32)
+	data_len = np.zeros(shape=num_episodes, dtype=np.int32)
+	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len}
 
 	mean_length = 0
 	if showProgress:
@@ -118,16 +125,17 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,stateFeaturesMask
 
 	for i in range(num_episodes):
 		episode_data, length = collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask,exportAllStateFeatures,render)
-		data.append(episode_data)
-		mean_length += length
+		data["s"][i] = episode_data["s"]
+		data["a"][i] = episode_data["a"]
+		data["r"][i] = episode_data["r"]
+		data["len"][i] = length
 		if showProgress:
 			bar.next()
 
 	if showProgress:
 		bar.finish()	
-	mean_length /= num_episodes
 
-	return [data,mean_length]
+	return data
 
 
 def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
@@ -141,20 +149,22 @@ def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
 	
 	if plotGradient:
 		xs = []
+		mys = []
 		ys = []
 		plt.plot(xs,ys)
+		plt.plot(xs,mys)
 
 	optimizer = AdamOptimizer(learner.policy.paramsShape, learning_rate=0.1, beta1=0.9, beta2=0.99)
 
-	avg = 0.99
+	avg = 0.95
 	avg_mean_length = 0
-	avg_gradient = 0
+	avg_max_gradient = 0
 	mt = avg
 
 	for step in range(steps):
 
-		eps, mean_length = collect_gridworld_episodes(learner.mdp,learner.policy,nEpisodes,
-						   learner.mdp.horizon,sfmask,False)
+		eps = collect_gridworld_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,
+										stateFeaturesMask=sfmask,exportAllStateFeatures=False)
 
 		gradient = learner.estimate_gradient(eps)
 		update_step = optimizer.step(gradient)
@@ -162,22 +172,27 @@ def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
 		learner.policy.params += update_step
 
 		print("Step: "+str(step))
+		mean_length = np.mean(eps["len"])
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
 		avg_mean_length_t = avg_mean_length/(1-mt)
-		print("Average mean length:      "+str(np.round(avg_mean_length_t,3)))
-		avg_gradient = avg_gradient*avg+gradient/learner.policy.nFeatures*(1-avg)
-		avg_gradient_t = np.linalg.norm(np.ravel(np.asarray(avg_gradient)))/(1-mt)
+		print("Average mean length: "+str(np.round(avg_mean_length_t,3)))
+		max_gradient = np.max(gradient)
+		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
+		avg_max_gradient_t = avg_max_gradient/(1-mt)
 		mt = mt*avg
-		print("Average gradient/param:   "+str(np.round(avg_gradient_t,5))+"\n")
-		#print("Update step /param:       "+str(np.round(np.linalg.norm(np.ravel(np.asarray(update_step/learner.policy.nFeatures)),1),5))+"\n")
+		print("Avg maximum gradient:    "+str(np.round(avg_max_gradient_t,5))+"\n")
 
 		if plotGradient:
 			xs.append(step)
-			ys.append(avg_gradient_t)
+			ys.append(max_gradient)
+			mys.append(avg_max_gradient_t)
 			plt.gca().lines[0].set_xdata(xs)
 			plt.gca().lines[0].set_ydata(ys)
+			plt.gca().lines[1].set_xdata(xs)
+			plt.gca().lines[1].set_ydata(mys)
 			plt.gca().relim()
 			plt.gca().autoscale_view()
+			plt.yscale("log")
 			plt.pause(0.01)
 
 		if saveFile is not None and autosave and step%10==0:
@@ -188,8 +203,10 @@ def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
 		np.save(saveFile,learner.policy.params)
 		print("Params saved in ",saveFile,"\n")
 	
+	'''
 	if plotGradient:
 		plt.show()
+	'''
 
 
 def find_params_ml(estLearner,saveFile=None):
