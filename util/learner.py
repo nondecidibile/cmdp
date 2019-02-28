@@ -1,5 +1,4 @@
 import numpy as np
-from util.util import build_gridworld_features
 from progress.bar import Bar
 
 class GpomdpLearner:

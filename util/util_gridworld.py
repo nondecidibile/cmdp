@@ -176,7 +176,7 @@ def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
 		avg_mean_length_t = avg_mean_length/(1-mt)
 		print("Average mean length: "+str(np.round(avg_mean_length_t,3)))
-		max_gradient = np.max(gradient)
+		max_gradient = np.max(np.abs(gradient))
 		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
 		avg_max_gradient_t = avg_max_gradient/(1-mt)
 		mt = mt*avg

@@ -187,11 +187,13 @@ def clearn(learner, steps, nEpisodes, loadFile=None,
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
 		avg_mean_length_t = avg_mean_length/(1-mt)
 		print("Average mean length: "+str(np.round(avg_mean_length_t,3)))
-		max_gradient = np.max(gradient)
+		print(gradient)
+		max_gradient = np.max(np.abs(gradient))
 		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
 		avg_max_gradient_t = avg_max_gradient/(1-mt)
 		mt = mt*avg
-		print("Avg maximum gradient:    "+str(np.round(avg_max_gradient_t,5))+"\n")
+		print("Maximum gradient: "+str(np.round(max_gradient,5)))
+		print("Avg maximum gradient: "+str(np.round(avg_max_gradient_t,5))+"\n")
 
 		if plotGradient:
 			xs.append(step)

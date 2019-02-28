@@ -3,8 +3,8 @@ import sys
 from gym.envs.toy_text import gridworld
 from util.learner import *
 from util.optimizer import *
-from util.policy import *
-from util.util import *
+from util.policy_boltzmann import *
+from util.util_gridworld import *
 
 
 mdp = gridworld.GridworldEnv()
@@ -16,16 +16,17 @@ mdp.horizon = 50
 #
 
 sfMask = np.array([1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],dtype=bool) # state features mask
-learner = GpomdpLearner(mdp,np.count_nonzero(sfMask),4,gamma=0.98)
+policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
+learner = GpomdpLearner(mdp,policy,gamma=0.98)
 
 learn(
 	learner=learner,
-	steps=0,
-	nEpisodes=200,
+	steps=5,
+	nEpisodes=500,
 	sfmask=sfMask,
 	loadFile="params8.npy",
 	saveFile=None,
-	autosave=True,
+	autosave=False,
 	plotGradient=True
 )
 
@@ -34,9 +35,11 @@ learn(
 # Policy & gradient estimation
 #
 
-N = 50000
-#eps,_ = collect_gridworld_episodes(mdp,learner.policy,N,mdp.horizon,sfMask,showProgress=True)
-estimated_learner = GpomdpLearner(mdp,16,4,gamma=0.98)
+N = 100
+eps = collect_gridworld_episodes(mdp,learner.policy,N,mdp.horizon,sfMask,showProgress=True)
+
+estimated_policy = BoltzmannPolicy(16,4)
+estimated_learner = GpomdpLearner(mdp,estimated_policy,gamma=0.98)
 
 # Load already estimated parameters
 #estimated_learner.policy.params = np.load("params8est.npy")
@@ -64,7 +67,7 @@ gradient,gradient_var = estimated_learner.estimate_gradient(eps,getSampleVarianc
 #
 
 # Confidence level
-delta = 0.2
+delta = 0.1
 
 
 ####### Hoeffding
