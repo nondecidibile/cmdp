@@ -1,46 +1,48 @@
 import numpy as np
 from progress.bar import Bar
 
-class GpomdpLearner:
 
-	"""
+class GpomdpLearner:
+    """
 	G(PO)MDP algorithm with baseline
 	"""
 
-	def __init__(self, mdp, policy, gamma=0.99):
+    alg_epsilon = 1e-9
 
-		self.mdp = mdp
-		self.gamma = gamma
+    def __init__(self, mdp, policy, gamma=0.99):
 
-		self.policy = policy
+        self.mdp = mdp
+        self.gamma = gamma
 
+        self.policy = policy
 
-	def draw_action(self, stateFeatures):
-		return self.policy.draw_action(stateFeatures)
+    def draw_action(self, stateFeatures):
+        return self.policy.draw_action(stateFeatures)
 
+    def estimate_gradient(self, data, getSampleVariance=False, showProgress=False):
 
-	def estimate_gradient(self, data, getSampleVariance=False, showProgress=False):
-
-		"""
+        """
 		Compute the gradient of J wrt to the policy params
 		"""
 
-		eps_s = data["s"]
-		eps_a = data["a"]
-		eps_r = data["r"]
-		eps_len = data["len"]
+        eps_s = data["s"]
+        eps_a = data["a"]
+        eps_r = data["r"]
+        eps_len = data["len"]
 
-		# Compute all the log-gradients
-		nEpisodes = len(eps_len)
-		maxEpLength = max(eps_len)
+        # Compute all the log-gradients
+        nEpisodes = len(eps_len)
+        maxEpLength = max(eps_len)
 
-		if showProgress:
-			bar = Bar('Computing gradient', max=nEpisodes)
-		
-		sl = np.zeros(shape=(nEpisodes,maxEpLength,self.policy.nParams),dtype=np.float32)
-		dr = np.zeros(shape=(nEpisodes,maxEpLength,self.policy.nParams),dtype=np.float32)
+        if showProgress:
+            bar = Bar('Computing gradient', max=nEpisodes)
 
-		for n,T in enumerate(eps_len):
+        sl = np.zeros(shape=(nEpisodes, maxEpLength, self.policy.nParams), dtype=np.float32)
+        dr = np.zeros(shape=(nEpisodes, maxEpLength), dtype=np.float32)
+
+        '''
+		dr = np.zeros(shape=(nEpisodes, maxEpLength, self.policy.nParams), dtype=np.float32)
+		for n, T in enumerate(eps_len):
 			for i in range(T):
 				g = np.ravel(self.policy.compute_log_gradient(eps_s[n,i],eps_a[n,i]))				
 				sl[n,i] = (g if i==0 else sl[n,i-1]+g)
@@ -49,39 +51,57 @@ class GpomdpLearner:
 				sl[n,j] = sl[n,j-1]
 			if showProgress:
 				bar.next()
-		
-		if showProgress:
-			bar.finish()
+		'''
 
-		#
-		# Compute the baseline
-		#
-		
-		num = np.sum(sl*sl*dr,axis=0)
-		den = np.sum(sl*sl,axis=0)+1e-09
-		b = num/den
+        for n, T in enumerate(eps_len):
+            # print(eps_s[n].shape)
+            # print(T)
+            # print(self.policy.compute_log_gradient(eps_s[n, :T], eps_a[n, :T]).shape)
+            g = self.policy.compute_log_gradient(eps_s[n, :T], eps_a[n, :T])
+            flat_g = np.reshape(g, (T, -1))
+            sl[n, :T] = np.cumsum(flat_g, axis=0)
+            dr[n, :T] = self.gamma ** np.arange(T) * eps_r[n, :T]
+            if showProgress:
+                bar.next()
 
+        if showProgress:
+            bar.finish()
 
-		#
-		# Compute the gradient
-		#
+        #
+        # Compute the baseline
+        #
 
-		grads_linear = sl*(dr-b)
+        num = np.sum(sl * sl * dr[:, :, None], axis=0)
+        den = np.sum(sl * sl, axis=0) + self.alg_epsilon
+        b = num / den
+
+        #
+        # Compute the gradient
+        #
+
+        grads_linear = sl * (dr[:, :, None] - b[None])
+        '''
 		gradient_ep_linear = np.sum(grads_linear,axis=1)/nEpisodes
 		gradient_linear = np.sum(gradient_ep_linear,axis=0)
 		gradient = np.reshape(gradient_linear,newshape=self.policy.paramsShape)
-		
-		if not getSampleVariance:
-			return gradient
-		
-		#
-		# Compute the sample variance
-		#
+		'''
+        gradient_ep = np.sum(grads_linear, axis=1)
+        gradient = np.reshape(np.mean(gradient_ep, axis=0), newshape=self.policy.paramsShape)
 
+        if not getSampleVariance:
+            return gradient
+
+        #
+        # Compute the sample variance
+        #
+
+        '''
 		variance = np.zeros(shape=self.policy.paramsShape, dtype=np.float32)
 		for i in range(nEpisodes):
 			variance += np.reshape(np.square(gradient_ep_linear[i]-gradient_linear),newshape=self.policy.paramsShape)
 		variance = variance/nEpisodes
+		'''
+        variance = np.var(gradient_ep, axis=0)
+        variance = np.reshape(variance, self.policy.paramsShape)
 
-		return (gradient,variance)
-	
+        return (gradient, variance)

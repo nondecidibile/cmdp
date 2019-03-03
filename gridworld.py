@@ -4,6 +4,7 @@ from gym.envs.toy_text import gridworld
 from util.learner import *
 from util.optimizer import *
 from util.policy_boltzmann import *
+from util.policy_epsilon_boltzmann import *
 from util.util_gridworld import *
 
 
@@ -16,18 +17,17 @@ mdp.horizon = 50
 #
 
 sfMask = np.array([1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],dtype=bool) # state features mask
-policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
+policy = EpsilonBoltzmannPolicy(np.count_nonzero(sfMask),4)
 learner = GpomdpLearner(mdp,policy,gamma=0.98)
 
 learn(
 	learner=learner,
-	steps=5,
+	steps=0,
 	nEpisodes=500,
 	sfmask=sfMask,
-	loadFile="params8.npy",
+	loadFile="params9.npy",
 	saveFile=None,
-	autosave=False,
-	plotGradient=True
+	plotGradient=False
 )
 
 
@@ -35,7 +35,7 @@ learn(
 # Policy & gradient estimation
 #
 
-N = 100
+N = 20000
 eps = collect_gridworld_episodes(mdp,learner.policy,N,mdp.horizon,sfMask,showProgress=True)
 
 estimated_policy = BoltzmannPolicy(16,4)
@@ -67,7 +67,7 @@ gradient,gradient_var = estimated_learner.estimate_gradient(eps,getSampleVarianc
 #
 
 # Confidence level
-delta = 0.1
+delta = 0.99
 
 
 ####### Hoeffding
