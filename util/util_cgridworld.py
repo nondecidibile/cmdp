@@ -7,7 +7,7 @@ import time
 import matplotlib.pyplot as plt
 
 
-def build_cgridworld_features(mdp,state):
+def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
 
 	D = mdp.DIM
 	ds = D/5
@@ -32,7 +32,14 @@ def build_cgridworld_features(mdp,state):
 			sf = 1./(np.sqrt(2.*np.pi)*sigma)*np.exp(-np.square(p_goal_dist/sigma)/2)
 			state_features.append(sf)
 	
-	return np.array(state_features, dtype=np.float32)
+	state_features = np.array(state_features, dtype=np.float32)
+
+	if stateFeaturesMask is None:
+		return state_features
+	else:
+		mask = np.array(stateFeaturesMask, dtype=bool)
+		assert(len(mask) == len(state_features))
+		return state_features[mask]
 			
 
 def draw_circle(x, y, r, canvas, **kwargs):
@@ -47,9 +54,9 @@ def lerp(a,b,alpha):
 	return b*alpha + (1-alpha)*a
 
 
-def collect_cgridworld_episode(mdp,policy,horizon,render=False):
+def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
 
-	nsf = policy.nStateFeatures
+	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
 	adim = policy.actionDim
 
 	states = np.zeros(shape=(horizon,nsf),dtype=np.float32)
@@ -73,8 +80,11 @@ def collect_cgridworld_episode(mdp,policy,horizon,render=False):
 
 		length += 1
 
-		state_features = build_cgridworld_features(mdp,state)
+		state_features = build_cgridworld_features(mdp,state,stateFeaturesMask)
 		action = policy.draw_action(state_features)
+
+		if exportAllStateFeatures is True:
+			state_features = build_cgridworld_features(mdp,state)
 
 		newstate, reward, done = mdp.step(action)
 
@@ -120,9 +130,12 @@ def collect_cgridworld_episode(mdp,policy,horizon,render=False):
 	return [episode_data,length]
 
 
-def collect_cgridworld_episodes(mdp,policy,num_episodes,horizon,render=False,showProgress=False):
+def collect_cgridworld_episodes(
+	mdp, policy, num_episodes, horizon,
+	stateFeaturesMask=None, exportAllStateFeatures=True,
+	render=False, showProgress=False):
 
-	nsf = policy.nStateFeatures
+	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
 	adim = policy.actionDim
 
 	data_s = np.zeros(shape=(num_episodes,horizon,nsf),dtype=np.float32)
@@ -136,7 +149,7 @@ def collect_cgridworld_episodes(mdp,policy,num_episodes,horizon,render=False,sho
 		bar = Bar('Collecting episodes', max=num_episodes)
 	
 	for i in range(num_episodes):
-		episode_data, length = collect_cgridworld_episode(mdp,policy,horizon,render)
+		episode_data, length = collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask,exportAllStateFeatures,render)
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
 		data["r"][i] = episode_data["r"]
@@ -150,7 +163,7 @@ def collect_cgridworld_episodes(mdp,policy,num_episodes,horizon,render=False,sho
 	return data
 
 
-def clearn(learner, steps, nEpisodes, loadFile=None,
+def clearn(learner, steps, nEpisodes, sfmask=None, loadFile=None,
 		saveFile=None, autosave=False, plotGradient=False):
 
 	if loadFile is not None:
@@ -171,11 +184,14 @@ def clearn(learner, steps, nEpisodes, loadFile=None,
 	avg = 0.95
 	avg_mean_length = 0
 	avg_max_gradient = 0
+	avg_mean_gradient = 0
 	mt = avg
 
 	for step in range(steps):
 
-		eps = collect_cgridworld_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon)
+		eps = collect_cgridworld_episodes(
+			learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,
+			stateFeaturesMask=sfmask,exportAllStateFeatures=False)
 
 		gradient = learner.estimate_gradient(eps)
 		update_step = optimizer.step(gradient)
@@ -191,14 +207,19 @@ def clearn(learner, steps, nEpisodes, loadFile=None,
 		max_gradient = np.max(np.abs(gradient))
 		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
 		avg_max_gradient_t = avg_max_gradient/(1-mt)
-		mt = mt*avg
 		print("Maximum gradient: "+str(np.round(max_gradient,5)))
 		print("Avg maximum gradient: "+str(np.round(avg_max_gradient_t,5))+"\n")
+		mean_gradient = np.mean(np.abs(gradient))
+		avg_mean_gradient = avg_mean_gradient*avg+mean_gradient*(1-avg)
+		avg_mean_gradient_t = avg_mean_gradient/(1-mt)
+		mt = mt*avg
+		print("Mean gradient: "+str(np.round(mean_gradient,5)))
+		print("Avg mean gradient: "+str(np.round(avg_mean_gradient_t,5))+"\n")
 
 		if plotGradient:
 			xs.append(step)
-			ys.append(max_gradient)
-			mys.append(avg_max_gradient_t)
+			ys.append(mean_gradient)
+			mys.append(avg_mean_gradient_t)
 			plt.gca().lines[0].set_xdata(xs)
 			plt.gca().lines[0].set_ydata(ys)
 			plt.gca().lines[1].set_xdata(xs)
