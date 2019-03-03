@@ -2,7 +2,7 @@ import numpy as np
 from util.policy import Policy
 
 
-class BoltzmannPolicy(Policy):
+class EpsilonBoltzmannPolicy(Policy):
 
 	"""
 	Boltzmann policy
@@ -10,7 +10,7 @@ class BoltzmannPolicy(Policy):
 	Parameters are in a matrix (actions) x (state_features)
 	"""
 
-	def __init__(self, nStateFeatures, nActions, paramFillValue=0.1):
+	def __init__(self, nStateFeatures, nActions, epsilon=0.1, paramFillValue=0.1):
 
 		super().__init__()
 
@@ -18,6 +18,8 @@ class BoltzmannPolicy(Policy):
 		self.nStateFeatures = nStateFeatures
 
 		self.nParams = nActions * nStateFeatures
+
+		self.epsilon = epsilon
 
 		self.paramsShape = (self.nActions,self.nStateFeatures)
 		self.params = np.zeros(self.paramsShape) #np.random.random_sample(self.paramsShape)*paramFillValue - paramFillValue/2
@@ -28,9 +30,10 @@ class BoltzmannPolicy(Policy):
 		assert(len(stateFeatures)==self.nStateFeatures)
 
 		terms = np.exp(np.dot(self.params,stateFeatures))
-		sum_terms = np.sum(terms)
+		prob = terms / np.sum(terms)
+		prob = (1 - self.epsilon) * prob + self.epsilon / self.nActions
 		
-		return terms/sum_terms
+		return prob
 	
 
 	def draw_action(self, stateFeatures):
@@ -91,12 +94,17 @@ class BoltzmannPolicy(Policy):
 		log_gradient[action] = log_gradient[action] + stateFeatures
 		'''
 
-		prob = np.exp(np.dot(stateFeatures, self.params.T))
-		prob = prob / np.sum(prob, axis=1)[:, None]
-		mean = prob[:, :, None] * stateFeatures[:, None, :]
-		log_gradient = -mean
+		terms = np.exp(np.dot(stateFeatures, self.params.T))
+		sum_terms = np.sum(terms, axis=1)[:, None]
+		terms_features = terms[:, :, None] * stateFeatures[:, None, :]
+
 		row_index = np.arange(stateFeatures.shape[0], dtype=np.int)
-		log_gradient[row_index, action] = log_gradient[row_index, action] + stateFeatures
+		den = (1 - self.epsilon) * (terms[row_index, action] + self.epsilon / self.nActions * np.sum(terms, axis=1))
+
+		log_gradient = -terms_features / sum_terms[:, :, None] + self.epsilon / self.nActions * terms_features / den[:, None, None]
+
+		num = (1 - self.epsilon) * stateFeatures * terms[row_index, action][:, None]
+		log_gradient[row_index, action] = log_gradient[row_index, action] + num / den[:, None]
 
 		return log_gradient
 	

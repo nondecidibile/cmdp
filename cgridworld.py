@@ -15,13 +15,12 @@ learner = GpomdpLearner(mdp,policy,gamma=0.98)
 
 clearn(
 	learner,
-	steps=2500,
+	steps=500,
 	nEpisodes=500,
-	sfmask=sfMask,
-	loadFile="cparams25.npy",
-	saveFile="cparams25.npy",
+	loadFile=None, #"cparams.npy",
+	saveFile=None,#"cparams.npy",
 	autosave=True,
-	plotGradient=True
+	plotGradient=False
 )
 
 
