@@ -7,7 +7,10 @@ from util.learner import *
 mdp = gridworld_cont.GridworldContEnv()
 mdp.horizon = 50
 
-policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
+sfMask = np.ones(shape=50,dtype=bool) # state features mask
+sfMask[25:50] = False
+
+policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
 learner = GpomdpLearner(mdp,policy,gamma=0.98)
 
 clearn(
@@ -22,16 +25,10 @@ clearn(
 
 
 #
-# Render some episodes
-#
-collect_cgridworld_episodes(mdp,policy,20,mdp.horizon,render=True)
-
-
-#
 # Gradient estimation
 #
-'''
-N = 2000
+
+N = 1000
 
 estimated_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
 estimated_learner = GpomdpLearner(mdp,estimated_policy,gamma=0.98)
@@ -45,8 +42,7 @@ for a in range(learner.policy.paramsShape[0]):
 			estimated_learner.policy.params[a,sf] = 0
 
 # Estimate gradient with N trajectories
-eps = collect_cgridworld_episodes(mdp,learner.policy,N,mdp.horizon,showProgress=True)
+eps = collect_cgridworld_episodes(mdp,learner.policy,N,mdp.horizon,sfMask,exportAllStateFeatures=True,showProgress=True)
 gradient,gradient_var = estimated_learner.estimate_gradient(eps,getSampleVariance=True,showProgress=True)
 
 print(gradient)
-'''
