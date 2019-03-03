@@ -7,8 +7,8 @@ class GridworldContEnv(gym.Env):
 	def __init__(self):
 
 		self.DIM = 5
-		self.MAX_SPEED = 2
-		self.END_DISTANCE = 1
+		self.MAX_SPEED = 1
+		self.END_DISTANCE = 0.75
 
 		self.max_action = np.array([self.MAX_SPEED,self.MAX_SPEED])
 		self.max_position = np.array([self.DIM/2,self.DIM/2,self.DIM/2,self.DIM/2])

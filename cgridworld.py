@@ -8,19 +8,20 @@ mdp = gridworld_cont.GridworldContEnv()
 mdp.horizon = 50
 
 sfMask = np.ones(shape=50,dtype=bool) # state features mask
-sfMask[25:50] = False
+#sfMask[40:50] = False
 
 policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
 learner = GpomdpLearner(mdp,policy,gamma=0.98)
 
 clearn(
 	learner,
-	steps=500,
-	nEpisodes=500,
-	loadFile=None, #"cparams.npy",
+	steps=0,
+	nEpisodes=250,
+	sfmask=sfMask,
+	loadFile="cparams.npy",
 	saveFile=None,#"cparams.npy",
 	autosave=True,
-	plotGradient=False
+	plotGradient=True
 )
 
 
@@ -46,3 +47,14 @@ eps = collect_cgridworld_episodes(mdp,learner.policy,N,mdp.horizon,sfMask,export
 gradient,gradient_var = estimated_learner.estimate_gradient(eps,getSampleVariance=True,showProgress=True)
 
 print(gradient)
+
+
+####### Chebyshev
+Rmax = 1
+v = 1/0.25 # phi_max^2 / sigma^2
+T = 50
+gamma = 0.98
+delta = 0.1
+variance = np.square(Rmax)*v/np.power(1-gamma,3)*(1-np.power(gamma,T))*(T*np.power(gamma,T+1)-(T+1)*np.power(gamma,T)+1)
+c_epsilon = np.sqrt(variance/(N*delta))
+print("\nChebyshev: ",c_epsilon)

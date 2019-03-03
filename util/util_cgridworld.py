@@ -11,7 +11,7 @@ def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
 
 	D = mdp.DIM
 	ds = D/5
-	sigma = 2
+	sigma = 1
 
 	x,y,xg,yg = state
 	p = np.array([x,y],dtype=np.float32)
@@ -52,6 +52,16 @@ def draw_circle(x, y, r, canvas, **kwargs):
 
 def lerp(a,b,alpha):
 	return b*alpha + (1-alpha)*a
+
+
+def draw_grid(canvas,DIM,mdp_dim):
+	for i in range(-2,3):
+		for j in range(-2,3):
+			draw_circle(DIM/2+i*(DIM/mdp_dim),DIM-(DIM/2+j*(DIM/mdp_dim)),1,canvas,fill="white")
+			if i==-2 and j==-2:
+				draw_circle(DIM/2+i*(DIM/mdp_dim),DIM-(DIM/2+j*(DIM/mdp_dim)),2,canvas,fill="yellow")
+			if i==2 and j==2:
+				draw_circle(DIM/2+i*(DIM/mdp_dim),DIM-(DIM/2+j*(DIM/mdp_dim)),2,canvas,fill="orange")
 
 
 def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
@@ -101,8 +111,9 @@ def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportA
 				tx = lerp(xx,x,i/30)
 				ty = lerp(yy,y,i/30)
 				canvas.delete('all')
-				draw_circle(DIM/2+tx*(DIM/mdp.DIM)/2,DIM/2+ty*(DIM/mdp.DIM)/2,10,canvas,fill="blue")
-				draw_circle(DIM/2+xg*(DIM/mdp.DIM)/2,DIM/2+yg*(DIM/mdp.DIM)/2,DIM/2*mdp.END_DISTANCE/mdp.DIM,canvas,outline="red")
+				draw_grid(canvas,DIM,mdp.DIM)
+				draw_circle(DIM/2+tx*(DIM/mdp.DIM),DIM-(DIM/2+ty*(DIM/mdp.DIM)),10,canvas,fill="blue")
+				draw_circle(DIM/2+xg*(DIM/mdp.DIM),DIM-(DIM/2+yg*(DIM/mdp.DIM)),DIM*mdp.END_DISTANCE/mdp.DIM,canvas,outline="red")
 				window.update()
 				time.sleep(0.004)
 			xx = x
@@ -120,10 +131,11 @@ def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportA
 			tx = lerp(xx,x,i/30)
 			ty = lerp(yy,y,i/30)
 			canvas.delete('all')
-			draw_circle(DIM/2+tx*(DIM/mdp.DIM)/2,DIM/2+ty*(DIM/mdp.DIM)/2,10,canvas,fill="blue")
-			draw_circle(DIM/2+xg*(DIM/mdp.DIM)/2,DIM/2+yg*(DIM/mdp.DIM)/2,DIM/2*mdp.END_DISTANCE/mdp.DIM,canvas,outline="red")
+			draw_grid(canvas,DIM,mdp.DIM)
+			draw_circle(DIM/2+tx*(DIM/mdp.DIM),DIM-(DIM/2+ty*(DIM/mdp.DIM)),10,canvas,fill="blue")
+			draw_circle(DIM/2+xg*(DIM/mdp.DIM),DIM-(DIM/2+yg*(DIM/mdp.DIM)),DIM*mdp.END_DISTANCE/mdp.DIM,canvas,outline="red")
 			window.update()
-			time.sleep(0.003)
+			time.sleep(0.004)
 		window.destroy()
 
 	episode_data = {"s": states,"a": actions,"r": rewards}
