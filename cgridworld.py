@@ -8,7 +8,7 @@ mdp = gridworld_cont.GridworldContEnv()
 mdp.horizon = 50
 
 sfMask = np.ones(shape=50,dtype=bool) # state features mask
-#sfMask[40:50] = False
+sfMask[30:50] = False
 
 policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
 learner = GpomdpLearner(mdp,policy,gamma=0.98)
@@ -16,10 +16,10 @@ learner = GpomdpLearner(mdp,policy,gamma=0.98)
 clearn(
 	learner,
 	steps=0,
-	nEpisodes=250,
+	nEpisodes=500,
 	sfmask=sfMask,
-	loadFile="cparams.npy",
-	saveFile=None,#"cparams.npy",
+	loadFile="cparams30.npy",
+	saveFile=None,#"cparams30.npy",
 	autosave=True,
 	plotGradient=True
 )

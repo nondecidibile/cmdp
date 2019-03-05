@@ -18,18 +18,20 @@ def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
 	p_goal = np.array([xg,yg],dtype=np.float32)
 	state_features = []
 
-	for i in range(-2,3):
-		for j in range(-2,3):
+	for j in range(-2,3):
+		for i in range(-2,3):
 			grid_point = np.array([ds*i,ds*j],dtype=np.float32)
 			p_dist = np.linalg.norm(p-grid_point)
-			sf = 1./(np.sqrt(2.*np.pi)*sigma)*np.exp(-np.square(p_dist/sigma)/2)
+			#sf = 1./(np.sqrt(2.*np.pi)*sigma)*np.exp(-np.square(p_dist/sigma)/2)
+			sf = np.exp(-p_dist**2)
 			state_features.append(sf)
 	
-	for i in range(-2,3):
-		for j in range(-2,3):
+	for j in range(-2,3):
+		for i in range(-2,3):
 			grid_point = np.array([ds*i,ds*j],dtype=np.float32)
 			p_goal_dist = np.linalg.norm(p_goal-grid_point)
-			sf = 1./(np.sqrt(2.*np.pi)*sigma)*np.exp(-np.square(p_goal_dist/sigma)/2)
+			#sf = 1./(np.sqrt(2.*np.pi)*sigma)*np.exp(-np.square(p_goal_dist/sigma)/2)
+			sf = np.exp(-p_goal_dist**2)
 			state_features.append(sf)
 	
 	state_features = np.array(state_features, dtype=np.float32)
@@ -38,7 +40,7 @@ def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
 		return state_features
 	else:
 		mask = np.array(stateFeaturesMask, dtype=bool)
-		assert(len(mask) == len(state_features))
+		#assert(len(mask) == len(state_features))
 		return state_features[mask]
 			
 
