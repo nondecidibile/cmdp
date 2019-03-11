@@ -4,8 +4,6 @@ from progress.bar import Bar
 import matplotlib.pyplot as plt
 from tkinter import *
 import time
-import matplotlib.pyplot as plt
-
 
 def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
 
@@ -177,8 +175,8 @@ def collect_cgridworld_episodes(
 	return data
 
 
-def clearn(learner, steps, nEpisodes, sfmask=None, loadFile=None,
-		saveFile=None, autosave=False, plotGradient=False):
+def clearn(learner, steps, nEpisodes, sfmask=None, adamOptimizer=True, learningRate=0.1,
+		loadFile=None, saveFile=None, autosave=False, plotGradient=False):
 
 	if loadFile is not None:
 		learner.policy.params = np.load(loadFile)
@@ -193,7 +191,8 @@ def clearn(learner, steps, nEpisodes, sfmask=None, loadFile=None,
 		plt.plot(xs,ys)
 		plt.plot(xs,mys)
 
-	optimizer = AdamOptimizer(learner.policy.paramsShape, learning_rate=0.1, beta1=0.9, beta2=0.99)
+	if adamOptimizer:
+		optimizer = AdamOptimizer(learner.policy.paramsShape, learning_rate=learningRate, beta1=0.9, beta2=0.99)
 
 	avg = 0.95
 	avg_mean_length = 0
@@ -208,7 +207,10 @@ def clearn(learner, steps, nEpisodes, sfmask=None, loadFile=None,
 			stateFeaturesMask=sfmask,exportAllStateFeatures=False)
 
 		gradient = learner.estimate_gradient(eps)
-		update_step = optimizer.step(gradient)
+		if adamOptimizer:
+			update_step = optimizer.step(gradient)
+		else:
+			update_step = gradient*learningRate
 
 		learner.policy.params += update_step
 
@@ -216,19 +218,19 @@ def clearn(learner, steps, nEpisodes, sfmask=None, loadFile=None,
 		mean_length = np.mean(eps["len"])
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
 		avg_mean_length_t = avg_mean_length/(1-mt)
-		print("Average mean length: "+str(np.round(avg_mean_length_t,3)))
-		#print(gradient)
+		print("Mean length: "+str(np.round(mean_length,3)))
+		#print("Average mean length: "+str(np.round(avg_mean_length_t,3)))
 		max_gradient = np.max(np.abs(gradient))
 		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
 		avg_max_gradient_t = avg_max_gradient/(1-mt)
 		print("Maximum gradient: "+str(np.round(max_gradient,5)))
-		print("Avg maximum gradient: "+str(np.round(avg_max_gradient_t,5))+"\n")
+		#print("Avg maximum gradient: "+str(np.round(avg_max_gradient_t,5)))
 		mean_gradient = np.mean(np.abs(gradient))
 		avg_mean_gradient = avg_mean_gradient*avg+mean_gradient*(1-avg)
 		avg_mean_gradient_t = avg_mean_gradient/(1-mt)
 		mt = mt*avg
 		print("Mean gradient: "+str(np.round(mean_gradient,5)))
-		print("Avg mean gradient: "+str(np.round(avg_mean_gradient_t,5))+"\n")
+		#print("Avg mean gradient: "+str(np.round(avg_mean_gradient_t,5))+"\n")
 
 		if plotGradient:
 			xs.append(step)
