@@ -53,7 +53,7 @@ for a in range(learner.policy.paramsShape[0]):
 			estimated_learner.policy.params[a,sf] = 0
 
 # Find params with Maximum Likelihood
-#find_params_ml(estLearner=estimated_learner,saveFile=None)
+#find_params_ml(estimated_learner,eps,saveFile=None)
 
 #gradient = np.load("gradient8.npy")
 #gradient_var = np.load("gradient8var.npy")

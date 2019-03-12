@@ -138,8 +138,8 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,stateFeaturesMask
 	return data
 
 
-def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
-		saveFile=None, autosave=False, plotGradient=False):
+def learn(learner, steps, nEpisodes, sfmask, adamOptimizer=True, learningRate=0.1,
+		loadFile=None, saveFile=None, autosave=False, plotGradient=False):
 
 	if loadFile is not None:
 		learner.policy.params = np.load(loadFile)
@@ -154,7 +154,8 @@ def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
 		plt.plot(xs,ys)
 		plt.plot(xs,mys)
 
-	optimizer = AdamOptimizer(learner.policy.paramsShape, learning_rate=0.1, beta1=0.9, beta2=0.99)
+	if adamOptimizer:
+		optimizer = AdamOptimizer(learner.policy.paramsShape, learning_rate=learningRate, beta1=0.9, beta2=0.99)
 
 	avg = 0.95
 	avg_mean_length = 0
@@ -167,7 +168,10 @@ def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
 										stateFeaturesMask=sfmask,exportAllStateFeatures=False)
 
 		gradient = learner.estimate_gradient(eps)
-		update_step = optimizer.step(gradient)
+		if adamOptimizer:
+			update_step = optimizer.step(gradient)
+		else:
+			update_step = learningRate*gradient
 
 		learner.policy.params += update_step
 
@@ -209,7 +213,7 @@ def learn(learner, steps, nEpisodes, sfmask, loadFile=None,
 	'''
 
 
-def find_params_ml(estLearner,saveFile=None):
+def find_params_ml(estLearner,eps,saveFile=None):
 
 	print("Estimating policy parameters with Maximum Likelihood...\n")
 	optimizer = AdamOptimizer(estLearner.policy.paramsShape,learning_rate=2.5)

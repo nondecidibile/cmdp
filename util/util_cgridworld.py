@@ -16,23 +16,22 @@ def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
 	p_goal = np.array([xg,yg],dtype=np.float32)
 	state_features = []
 
-	for j in range(-2,3):
-		for i in range(-2,3):
-			grid_point = np.array([ds*i,ds*j],dtype=np.float32)
-			p_dist = np.linalg.norm(p-grid_point)
-			#sf = 1./(np.sqrt(2.*np.pi)*sigma)*np.exp(-np.square(p_dist/sigma)/2)
-			sf = np.exp(-p_dist**2)
-			state_features.append(sf)
+	i = np.linspace(-2*ds, 2*ds, 5)
+	grid_points = np.meshgrid(i,i)
+
+	dist_x = x - grid_points[0]
+	dist_y = y - grid_points[1]
+
+	dists = np.ravel(np.linalg.norm([dist_x,dist_y],axis=0))
+	asf = np.exp(-dists**2)
+
+	g_dist_x = xg - grid_points[0]
+	g_dist_y = yg - grid_points[1]
+
+	gdists = np.ravel(np.linalg.norm([g_dist_x,g_dist_y],axis=0))
+	gsf = np.exp(-gdists**2)
 	
-	for j in range(-2,3):
-		for i in range(-2,3):
-			grid_point = np.array([ds*i,ds*j],dtype=np.float32)
-			p_goal_dist = np.linalg.norm(p_goal-grid_point)
-			#sf = 1./(np.sqrt(2.*np.pi)*sigma)*np.exp(-np.square(p_goal_dist/sigma)/2)
-			sf = np.exp(-p_goal_dist**2)
-			state_features.append(sf)
-	
-	state_features = np.array(state_features, dtype=np.float32)
+	state_features = np.ravel([asf,gsf])
 
 	if stateFeaturesMask is None:
 		return state_features

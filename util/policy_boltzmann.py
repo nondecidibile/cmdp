@@ -123,7 +123,7 @@ class BoltzmannPolicy(Policy):
 		while flag:
 		
 			grad = np.zeros(shape=self.paramsShape, dtype=np.float32)
-
+			'''
 			for ep in data:
 
 				for i in range(ep["a"].size):
@@ -133,6 +133,9 @@ class BoltzmannPolicy(Policy):
 					action = ep["a"][i]
 					
 					grad += self.compute_log_gradient(state_features,action)
+			'''
+			for ep_n,ep_len in enumerate(data["len"]):
+				grad += np.sum(self.compute_log_gradient(data["s"][ep_n][0:ep_len],data["a"][ep_n][0:ep_len]))
 			
 			update_step = optimizer.step(grad)
 			self.params = self.params + update_step
