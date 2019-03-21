@@ -122,10 +122,12 @@ class GpomdpLearner:
 
         fisherInformation /= np.sum(eps_len)
         
+        '''
         w,v = np.linalg.eig(fisherInformation)
         c = np.linalg.cond(fisherInformation)
 
         print("eigenvalues: ",w)
         print("cond: ",c)
+        '''
 
         return fisherInformation

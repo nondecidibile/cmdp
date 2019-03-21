@@ -90,3 +90,20 @@ class GaussianPolicy(Policy):
 				flag = True
 
 		return self.params
+	
+
+	def getAnalyticalFisherInformation(self, data):
+		
+		eps_s = data["s"]
+		eps_len = data["len"]
+
+		fisherInformation = np.zeros(shape=(self.nStateFeatures,self.nStateFeatures),dtype=np.float32)
+
+		for n,T in enumerate(eps_len):
+			sf = eps_s[n,:T]
+			f = np.matmul(sf.T,sf)
+			fisherInformation += f
+
+		fisherInformation /= np.sum(eps_len)
+
+		return fisherInformation

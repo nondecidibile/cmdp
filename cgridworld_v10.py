@@ -37,7 +37,7 @@ super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
 
 
 # collect episodes with agent's policy
-N = 1000
+N = 10000
 eps = collect_cgridworld_episodes(mdp,agent_learner.policy,N,mdp.horizon,sfMask,exportAllStateFeatures=True,showProgress=True)
 
 # estimated agent parameters with MLE
@@ -45,12 +45,11 @@ optimizer = AdamOptimizer(super_learner.policy.paramsShape,learning_rate=0.3)
 params = super_learner.policy.estimate_params(eps,optimizer,None,epsilon=0.01,minSteps=150,maxSteps=500)
 print(params)
 
-fisherInfo = super_learner.getFisherInformation(eps)
+#fisherInfo = super_learner.getFisherInformation(eps)
+fisherInfo = super_learner.policy.getAnalyticalFisherInformation(eps)
 invFisherDiag = np.diagonal(np.linalg.inv(fisherInfo))
 
-print(invFisherDiag)
-
-var_terms = np.reshape(np.sqrt(invFisherDiag), newshape=super_learner.policy.params.shape)
+var_terms = np.ravel(np.sqrt(invFisherDiag))
 estimator_terms = super_learner.policy.params * np.sqrt(N) / var_terms
 
 z_0_90 = 1.65

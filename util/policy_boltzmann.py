@@ -115,8 +115,6 @@ class BoltzmannPolicy(Policy):
 		else:
 			self.params = np.zeros(shape=self.paramsShape)
 		
-		old_params = self.params
-
 		flag = True
 		steps = 0
 
@@ -140,3 +138,35 @@ class BoltzmannPolicy(Policy):
 
 		return self.params
 	
+
+	def getAnalyticalFisherInformation(self, data):
+		
+		eps_s = data["s"]
+		eps_len = data["len"]
+
+		fisherInformation = np.zeros(shape=(self.nParams,self.nParams),dtype=np.float32)
+
+		for n,T in enumerate(eps_len):
+			for t in range(T):
+				sf = eps_s[n,t]
+				policy = self.compute_policy(sf)
+
+				x1 = np.zeros(shape=(self.nParams,self.nParams))
+				for a in range(self.nActions):
+					sa = np.zeros(shape=self.nParams)
+					sa[a*self.nStateFeatures:(a+1)*self.nStateFeatures] = sf
+					x1 += policy[a]*np.outer(sa,sa)
+
+				x2_vec = np.multiply(np.tile(sf,(self.nActions,1)).T,policy).T
+				x2_vec = np.ravel(x2_vec)
+				x2 = np.outer(x2_vec,x2_vec)
+
+				fisherInformation += x1-x2
+
+			#sf = eps_s[n,:T]
+			#f = np.matmul(sf.T,sf)
+			#fisherInformation += f
+
+		fisherInformation /= np.sum(eps_len)
+
+		return fisherInformation

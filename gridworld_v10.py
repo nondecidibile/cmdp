@@ -45,7 +45,8 @@ optimizer = AdamOptimizer(super_learner.policy.paramsShape,learning_rate=0.3)
 params = super_learner.policy.estimate_params(eps,optimizer,None,epsilon=0.01,minSteps=150,maxSteps=500)
 print(params)
 
-fisherInfo = super_learner.getFisherInformation(eps)
+#fisherInfo = super_learner.getFisherInformation(eps)
+fisherInfo = super_learner.policy.getAnalyticalFisherInformation(eps)
 maxeig = np.max(np.linalg.eigh(fisherInfo)[0])
 fisherInfo += np.eye(fisherInfo.shape[0])*0.1*maxeig
 
