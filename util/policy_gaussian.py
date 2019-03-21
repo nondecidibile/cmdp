@@ -67,7 +67,7 @@ class GaussianPolicy(Policy):
 		if params is not None:
 			self.params = params
 		else:
-			self.params = np.random.rand(self.paramsShape[0],self.paramsShape[1])/10 - 0.05
+			self.params = np.zeros(shape=self.paramsShape)
 		
 		flag = True
 		steps = 0
@@ -75,24 +75,13 @@ class GaussianPolicy(Policy):
 		while flag:
 		
 			grad = np.zeros(shape=self.paramsShape, dtype=np.float32)
-			'''
-			for ep in data:
 
-				for i in range(ep["a"].size):
-					
-					state_features = ep["s"][i]
-					reward = ep["r"][i]
-					action = ep["a"][i]
-					
-					grad += self.compute_log_gradient(state_features,action)
-			'''
 			for ep_n,ep_len in enumerate(data["len"]):
-				grad += np.sum(self.compute_log_gradient(data["s"][ep_n][0:ep_len],data["a"][ep_n][0:ep_len]))
+				grad += np.sum(self.compute_log_gradient(data["s"][ep_n][0:ep_len],data["a"][ep_n][0:ep_len]),axis=0)
 			
 			update_step = optimizer.step(grad)
 			self.params = self.params + update_step
-			
-			update_size = np.linalg.norm(np.ravel(np.asarray(update_step)),2)
+			update_size = np.abs(np.max(np.ravel(np.asarray(update_step))))
 			print(steps," - Update size :",update_size)
 			steps += 1
 			if update_size<epsilon or steps>maxSteps:

@@ -30,7 +30,7 @@ for i in range(100):
                 super_learner.policy.params[a,sf] = 0
     params_before = np.copy(super_learner.policy.params)
     # estimated gradient before the agent's update
-    N = 1000
+    N = 2000
     eps = collect_cgridworld_episodes(mdp,agent_learner.policy,N,mdp.horizon,sfMask,exportAllStateFeatures=True,showProgress=True)
     gradient_before,_ = super_learner.estimate_gradient(eps,getSampleVariance=True,showProgress=True)
 
@@ -38,7 +38,7 @@ for i in range(100):
     clearn(
         agent_learner,
         steps=1,
-        nEpisodes=1000,
+        nEpisodes=2000,
         sfmask=sfMask,
         adamOptimizer=False,
         learningRate=0.03,

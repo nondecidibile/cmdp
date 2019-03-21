@@ -105,3 +105,27 @@ class GpomdpLearner:
         variance = np.reshape(variance, self.policy.paramsShape)
 
         return (gradient, variance)
+
+    def getFisherInformation(self, data):
+
+        eps_s = data["s"]
+        eps_a = data["a"]
+        eps_len = data["len"]
+
+        fisherInformation = np.zeros(shape=(self.policy.nParams,self.policy.nParams),dtype=np.float32)
+
+        for n,T in enumerate(eps_len):
+            g = self.policy.compute_log_gradient(eps_s[n,:T],eps_a[n,:T])
+            flat_g = np.reshape(g, (T, -1))
+            f = np.matmul(flat_g.T,flat_g)
+            fisherInformation += f
+
+        fisherInformation /= np.sum(eps_len)
+        
+        w,v = np.linalg.eig(fisherInformation)
+        c = np.linalg.cond(fisherInformation)
+
+        print("eigenvalues: ",w)
+        print("cond: ",c)
+
+        return fisherInformation
