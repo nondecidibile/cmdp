@@ -35,7 +35,7 @@ class GridworldEnv(discrete.DiscreteEnv):
     """
     metadata = {'render.modes': ['human', 'ansi']}
 
-    def __init__(self):
+    def __init__(self, changeProb=0.0, targetRow=-1, targetCol=-1):
         self.desc = np.asarray(MAP,dtype='U')
 
         nS = 625
@@ -46,13 +46,46 @@ class GridworldEnv(discrete.DiscreteEnv):
         isd = np.zeros(nS)
         nA = 4
         P = {s : {a : [] for a in range(nA)} for s in range(nS)}
+
+        if changeProb<0:
+            changeProb = 0
+        if changeProb>1:
+            changeProb = 1
+        
+        if changeProb>0:
+            if targetRow==-1 and targetCol==-1:
+                print("Error in Gridworld::__init__, no target row or column specified.")
+                changeProb = 0
+            if targetRow!=-1 and targetCol!=-1:
+                print("Error in Gridworld::__init__, you can only specify one row or one column.")
+                changeProb = 0
+        
+        if changeProb>0:
+            if targetCol!=-1:
+                targetCol = np.int32(np.clip(targetCol,0,maxC))
+            if targetRow!=-1:
+                targetRow = np.int32(np.clip(targetRow,0,maxR))
+
         for row in range(5):
             for col in range(5):
                 for row_g in range(5):
                     for col_g in range(5):
                         state = self.encode(row, col, row_g, col_g)
                         if (row, col) != (row_g, col_g):
-                            isd[state] += 1
+                            if changeProb==0:
+                                prob = 1/25
+                            else:
+                                if targetCol!=-1:
+                                    if col_g==targetCol:
+                                        prob = changeProb/5
+                                    else:
+                                        prob = (1-changeProb)/20
+                                elif targetRow!=-1:
+                                    if row_g==targetRow:
+                                        prob = changeProb/5
+                                    else:
+                                        prob = (1-changeProb)/20
+                            isd[state] += prob
                         for a in range(nA):
                             # defaults
                             newrow, newcol = row, col
@@ -73,7 +106,7 @@ class GridworldEnv(discrete.DiscreteEnv):
                             
                             newstate = self.encode(newrow, newcol, row_g, col_g)
                             P[state][a].append((1.0, newstate, reward, done))
-        isd /= isd.sum()
+
         discrete.DiscreteEnv.__init__(self, nS, nA, P, isd)
 
     def encode(self, agentrow, agentcol, goalrow, goalcol):

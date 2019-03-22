@@ -104,6 +104,6 @@ class GaussianPolicy(Policy):
 			f = np.matmul(sf.T,sf)
 			fisherInformation += f
 
-		fisherInformation /= np.sum(eps_len)
+		fisherInformation /= np.sum(eps_len) * 0.25
 
 		return fisherInformation

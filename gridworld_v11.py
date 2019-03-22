@@ -7,11 +7,11 @@ from util.learner import *
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-mdp = gridworld.GridworldEnv()
+mdp = gridworld.GridworldEnv(changeProb=0.5,targetCol=2)
 mdp.horizon = 50
 
 sfMask = np.ones(shape=17,dtype=bool) # state features mask
-sfMask[12:16] = False
+sfMask[14] = False
 
 # AGENT SPACE
 agent_policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
@@ -24,7 +24,7 @@ learn(
 	sfmask=sfMask,
 	adamOptimizer=True,
 	learningRate=0.3,
-	loadFile="params12.npy",
+	loadFile=None,
 	saveFile=None,
 	autosave=False,
 	plotGradient=False
