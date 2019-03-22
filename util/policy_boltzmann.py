@@ -20,7 +20,7 @@ class BoltzmannPolicy(Policy):
 		self.nParams = nActions * nStateFeatures
 
 		self.paramsShape = (self.nActions,self.nStateFeatures)
-		self.params = np.zeros(self.paramsShape) #np.random.random_sample(self.paramsShape)*paramFillValue - paramFillValue/2
+		self.params = np.zeros(self.paramsShape)
 	
 
 	def compute_policy(self, stateFeatures):
@@ -44,52 +44,6 @@ class BoltzmannPolicy(Policy):
 		"""
 		Compute the gradient of the log of the policy function wrt to the policy params
 		"""
-
-		'''
-		assert(len(stateFeatures) == self.nStateFeatures)
-		assert(action >= 0 and action < self.nActions)
-		
-		# Build state-action features
-		sa_features = np.zeros((self.nActions, self.nParams))
-		row_index = np.repeat(np.arange(self.nActions, dtype=np.int), self.nStateFeatures)
-		col_index = np.arange(self.nParams, dtype=np.int)
-		sa_features[row_index, col_index] = np.tile(stateFeatures, self.nActions)
-
-		sa_features_old = []
-		for i in range(self.nActions):
-			sa_feature = []
-			for a in range(self.nActions):
-				sa_feature.append(int(a == i) * np.array(stateFeatures))
-			sa_features_old.append(np.array(sa_feature).ravel())
-		sa_features_old = np.array(sa_features_old)
-
-		assert np.allclose(sa_features, sa_features_old)
-
-
-		prob = np.exp(np.dot(self.params, stateFeatures))
-		prob = prob / np.sum(prob)
-
-		mean = np.outer(prob, stateFeatures)
-		log_gradient = -mean
-		log_gradient[action] = log_gradient[action] + stateFeatures
-
-
-		terms = np.exp(np.dot(self.params,stateFeatures))
-
-		log_gradient_old = sa_features[action] - np.average(sa_features, axis=0, weights=terms)
-		log_gradient_old = log_gradient_old.reshape(self.paramsShape)
-
-		assert np.allclose(log_gradient, log_gradient_old)
-		'''
-
-		'''
-		For one (s,a) at a time
-		prob = np.exp(np.dot(self.params, stateFeatures))
-		prob = prob / np.sum(prob)
-		mean = np.outer(prob, stateFeatures)
-		log_gradient = -mean
-		log_gradient[action] = log_gradient[action] + stateFeatures
-		'''
 
 		prob = np.exp(np.dot(stateFeatures, self.params.T))
 		prob = prob / np.sum(prob, axis=1)[:, None]
@@ -162,10 +116,6 @@ class BoltzmannPolicy(Policy):
 				x2 = np.outer(x2_vec,x2_vec)
 
 				fisherInformation += x1-x2
-
-			#sf = eps_s[n,:T]
-			#f = np.matmul(sf.T,sf)
-			#fisherInformation += f
 
 		fisherInformation /= np.sum(eps_len)
 

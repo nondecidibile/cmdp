@@ -54,6 +54,8 @@ def build_gridworld_features(mdp,observation,stateFeaturesMask=None):
 	# dst position
 	state_features += onehot_encode(row_g,4)
 	state_features += onehot_encode(col_g,4)
+	# constant term
+	state_features += [1]
 
 	if stateFeaturesMask is None:
 		return np.array(state_features)
