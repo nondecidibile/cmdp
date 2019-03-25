@@ -4,7 +4,7 @@ import numpy as np
 
 class GridworldContEnv(gym.Env):
 
-	def __init__(self, changeProb=0.0, xGoal1=-2.5, xGoal2=2.5, yGoal1=-2.5, yGoal2=2.5):
+	def __init__(self, changeProbs=[0.0,0.0], posBounds=[-2.5,-2.5,2.5,2.5], goalBounds=[-2.5,-2.5,2.5,2.5]):
 
 		self.DIM = 5
 		self.MAX_SPEED = 1
@@ -16,11 +16,9 @@ class GridworldContEnv(gym.Env):
 		self.observation_space = spaces.Box(-self.max_position, self.max_position, dtype=np.float32)
 		self.action_space = spaces.Box(-self.max_action, self.max_action, dtype=np.float32)
 
-		self.changeProb = np.clip(changeProb,0,1)
-		self.xGoal1 = xGoal1
-		self.xGoal2 = xGoal2
-		self.yGoal1 = yGoal1
-		self.yGoal2 = yGoal2
+		self.changeProbs = np.clip(changeProbs,0,1)
+		self.posBounds = posBounds
+		self.goalBounds = goalBounds
 
 	def dist(self,p1,p2):
 		return np.linalg.norm(p1-p2)
@@ -35,13 +33,22 @@ class GridworldContEnv(gym.Env):
 
 	def reset(self):
 		x,y,xg,yg = np.random.uniform(self.observation_space.low,self.observation_space.high)
-		if np.random.uniform() <= self.changeProb:
-			xg = np.random.uniform(np.minimum(self.xGoal1,self.xGoal2),np.maximum(self.xGoal1,self.xGoal2))
-			yg = np.random.uniform(np.minimum(self.yGoal1,self.yGoal2),np.maximum(self.yGoal1,self.yGoal2))
+		if np.random.uniform() <= self.changeProbs[0]:
+			x = np.random.uniform(np.min(self.posBounds[0:2]),np.max(self.posBounds[0:2]))
+			y = np.random.uniform(np.min(self.posBounds[2:4]),np.max(self.posBounds[2:4]))
+		if np.random.uniform() <= self.changeProbs[1]:
+			xg = np.random.uniform(np.min(self.goalBounds[0:2]),np.max(self.goalBounds[0:2]))
+			yg = np.random.uniform(np.min(self.goalBounds[2:4]),np.max(self.goalBounds[2:4]))
 		pos = np.array([x,y],dtype=np.float32)
 		dest = np.array([xg,yg],dtype=np.float32)
 		while self.check_end(pos,dest):
 			x,y,xg,yg = np.random.uniform(self.observation_space.low,self.observation_space.high)
+			if np.random.uniform() <= self.changeProbs[0]:
+				x = np.random.uniform(np.min(self.posBounds[0:2]),np.max(self.posBounds[0:2]))
+				y = np.random.uniform(np.min(self.posBounds[2:4]),np.max(self.posBounds[2:4]))
+			if np.random.uniform() <= self.changeProbs[1]:
+				xg = np.random.uniform(np.min(self.goalBounds[0:2]),np.max(self.goalBounds[0:2]))
+				yg = np.random.uniform(np.min(self.goalBounds[2:4]),np.max(self.goalBounds[2:4]))
 			pos = np.array([x,y],dtype=np.float32)
 			dest = np.array([xg,yg],dtype=np.float32)
 		self.state = np.array([x,y,xg,yg],dtype=np.float32)
