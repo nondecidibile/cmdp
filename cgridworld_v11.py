@@ -7,7 +7,7 @@ from util.learner import *
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-mdp = gridworld_cont.GridworldContEnv(changeProbs=[0.75,0],posBounds=[0.5,0.5,-0.5,-0.5])
+mdp = gridworld_cont.GridworldContEnv(changeProbs=[0.5,1],posBounds1=[-1,-1,2,2],posBounds2=[-1,-1,-1,-1], goalBounds1=[-2.5,2.5,0,2.5])
 mdp.horizon = 50
 
 sfMask = np.ones(shape=50,dtype=bool) # state features mask
