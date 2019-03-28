@@ -19,7 +19,7 @@ class GpomdpLearner:
     def draw_action(self, stateFeatures):
         return self.policy.draw_action(stateFeatures)
 
-    def estimate_gradient(self, data, getSampleVariance=False, showProgress=False):
+    def estimate_gradient(self, data, initialIS=None, getSampleVariance=False, showProgress=False, getEstimates=False):
 
         """
 		Compute the gradient of J wrt to the policy params
@@ -86,10 +86,17 @@ class GpomdpLearner:
 		gradient = np.reshape(gradient_linear,newshape=self.policy.paramsShape)
 		'''
         gradient_ep = np.sum(grads_linear, axis=1)
-        gradient = np.reshape(np.mean(gradient_ep, axis=0), newshape=self.policy.paramsShape)
+        
+        if getEstimates:
+            return gradient_ep
 
-        if not getSampleVariance:
-            return gradient
+        if initialIS is None:
+            gradient = np.reshape(np.mean(gradient_ep, axis=0), newshape=self.policy.paramsShape)
+        else:
+            # importance sampling
+            #gradient = np.reshape(np.average(gradient_ep,axis=0,weights=initialIS), newshape=self.policy.paramsShape)
+            gradient = np.mean(((gradient_ep.T*initialIS).T),axis=0)
+            return np.reshape(gradient,newshape=self.policy.paramsShape)
 
         #
         # Compute the sample variance

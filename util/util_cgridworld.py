@@ -68,6 +68,7 @@ def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportA
 	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
 	adim = policy.actionDim
 
+	original_states = np.zeros(shape=(horizon,4),dtype=np.float32)
 	states = np.zeros(shape=(horizon,nsf),dtype=np.float32)
 	actions = np.zeros(shape=(horizon,adim),dtype=np.float32)
 	rewards = np.zeros(shape=horizon,dtype=np.int32)
@@ -97,6 +98,7 @@ def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportA
 
 		newstate, reward, done = mdp.step(action)
 
+		original_states[i] = np.array([x,y,xg,yg])
 		states[i] = state_features
 		actions[i] = action
 		if done:
@@ -137,7 +139,7 @@ def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportA
 			time.sleep(0.004)
 		window.destroy()
 
-	episode_data = {"s": states,"a": actions,"r": rewards}
+	episode_data = {"state": original_states, "s": states,"a": actions,"r": rewards}
 	return [episode_data,length]
 
 
@@ -149,18 +151,19 @@ def collect_cgridworld_episodes(
 	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
 	adim = policy.actionDim
 
+	data_state = np.zeros(shape=(num_episodes,horizon,4),dtype=np.float32)
 	data_s = np.zeros(shape=(num_episodes,horizon,nsf),dtype=np.float32)
 	data_a = np.zeros(shape=(num_episodes,horizon,adim),dtype=np.float32)
 	data_r = np.zeros(shape=(num_episodes,horizon),dtype=np.int32)
 	data_len = np.zeros(shape=num_episodes, dtype=np.int32)
-	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len}
+	data = {"state": data_state, "s": data_s, "a": data_a, "r": data_r, "len": data_len}
 
-	mean_length = 0
 	if showProgress:
 		bar = Bar('Collecting episodes', max=num_episodes)
 	
 	for i in range(num_episodes):
 		episode_data, length = collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask,exportAllStateFeatures,render)
+		data["state"][i] = episode_data["state"]
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
 		data["r"][i] = episode_data["r"]
