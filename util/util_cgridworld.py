@@ -255,3 +255,24 @@ def clearn(learner, steps, nEpisodes, sfmask=None, adamOptimizer=True, learningR
 		np.save(saveFile,learner.policy.params)
 		print("Params saved in ",saveFile,"\n")
 	
+
+def d2gaussians(muP,covP,muQ,covQ):
+	muP = np.array(muP)
+	covP = np.array(covP)
+	muQ = np.array(muQ)
+	covQ = np.array(covQ)
+	A = 2*covQ-covP
+	t1 = (muP-muQ).T.dot(np.linalg.inv(A)).dot(muP-muQ)
+	t2 = 0.5*np.log(np.linalg.det(A)*np.linalg.det(covP)/(np.linalg.det(covQ)**2))
+	D2 = t1-t2
+	return np.exp(D2)
+
+def d_d2gaussians_dmuP(muP,covP,muQ,covQ):
+	muP = np.array(muP)
+	covP = np.array(covP)
+	muQ = np.array(muQ)
+	covQ = np.array(covQ)
+	invA = np.linalg.inv(2*covQ-covP)
+	t1 = d2gaussians(muP,covP,muQ,covQ)
+	t2 = (muP-muQ).T.dot(invA) + (muP-muQ).T.dot(invA.T)
+	return t1*t2

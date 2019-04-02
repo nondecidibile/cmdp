@@ -92,6 +92,7 @@ class GpomdpLearner:
 
         if initialIS is None:
             gradient = np.reshape(np.mean(gradient_ep, axis=0), newshape=self.policy.paramsShape)
+            return gradient
         else:
             # importance sampling
             #gradient = np.reshape(np.average(gradient_ep,axis=0,weights=initialIS), newshape=self.policy.paramsShape)
