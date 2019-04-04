@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 from gym.envs.toy_text import gridworld_cont_normal
+from gym.envs.toy_text import gridworld_cont
 from util.util_cgridworld import *
 from util.policy_gaussian import *
 from util.learner import *
@@ -9,7 +10,7 @@ np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
 mean_model1 = [-2,-2,2,2]
-var_model1 = [1,1,1,1]
+var_model1 = [0.1,0.1,0.1,0.1]
 mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=mean_model1,var=var_model1)
 mdp.horizon = 50
 
@@ -22,11 +23,11 @@ agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
 clearn(
 	agent_learner,
 	steps=0,
-	nEpisodes=1000,
+	nEpisodes=500,
 	sfmask=sfMask,
 	adamOptimizer=True,
 	learningRate=0.03,
-	loadFile="cgnorm1.npy",
+	loadFile="cgnorm.npy",
 	saveFile=None,
 	autosave=True,
 	plotGradient=False
@@ -37,14 +38,15 @@ super_policy = GaussianPolicy(50,2)
 super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
 
 # collect episodes with agent's policy
-N = 2000
+N = 1000
+#mdp = gridworld_cont.GridworldContEnv()
+#mdp.horizon = 50
 eps = collect_cgridworld_episodes(mdp,agent_learner.policy,N,mdp.horizon,sfMask,exportAllStateFeatures=True,showProgress=True)
 
 # estimated agent params and gradient
 optimizer = AdamOptimizer(super_learner.policy.paramsShape,learning_rate=0.3)
-estimated_params = super_learner.policy.estimate_params(eps,optimizer,None,epsilon=0.001,minSteps=150,maxSteps=500)
+estimated_params = super_learner.policy.estimate_params(eps,optimizer,None,epsilon=0.001,minSteps=150,maxSteps=300)
 estimated_gradient = super_learner.estimate_gradient(eps)
-#print("ESTIMATED GRADIENT:\n",estimated_gradient)
 
 # hypothesis testing on parameters == 0
 fisherInfo = super_learner.policy.getAnalyticalFisherInformation(eps)
@@ -77,18 +79,23 @@ sfTestMask = np.tile(sfTestMask,(2,1))
 sfTestMaskLin = np.ravel(sfTestMask)
 print(sfTestMask[0])
 
+#mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=mean_model1,var=var_model1)
+#mdp.horizon = 50
+#eps = collect_cgridworld_episodes(mdp,agent_learner.policy,N,mdp.horizon,sfMask,exportAllStateFeatures=True,showProgress=True)
+
 # estimated gradient with a different model (via importance sampling)
 initialStates = eps["state"][:,0]
 N1 = sp.stats.multivariate_normal(mean=mean_model1,cov=np.diag(var_model1))
 
 mean_model2 = [-2+0.1,-2,2,2]
-var_model2 = [1,1,1,1]
+var_model2 = var_model1
 
-model_optimizer = AdamOptimizer(shape=4,learning_rate=0.03)
+model_optimizer = AdamOptimizer(shape=4,learning_rate=0.01)
 
 for _i in range(150):
 	N2 = sp.stats.multivariate_normal(mean=mean_model2,cov=np.diag(var_model2))
 	initialIS = N2.pdf(initialStates) / N1.pdf(initialStates)
+	#print(np.linalg.norm(initialIS,ord=np.inf))
 	estimated_gradient2 = super_learner.estimate_gradient(eps,initialIS)
 	#print("MODEL 2:\n",estimated_gradient2)
 
@@ -111,8 +118,11 @@ for _i in range(150):
 	model_gradient_J = np.matmul(ddj,dj)
 
 	# ranyi divergence term
-	lambda_param = np.linalg.norm(estimated_gradient2,ord=np.inf)*np.sqrt(np.count_nonzero(sfTestMaskLin)/0.95)
-	print(lambda_param)
+	lambda_param = 1/4 * np.linalg.norm(estimated_gradient2,ord=np.inf)*np.sqrt(np.count_nonzero(sfTestMaskLin)/0.95)
+	print("lambda =",lambda_param)
+	print("d2 = ",d2gaussians(mean_model2,np.diag(var_model2),mean_model1,np.diag(var_model1)))
+	print("weights = ",np.mean(initialIS**2))
+
 	model_gradient_div = lambda_param/2/np.sqrt(len(eps["len"]))
 	model_gradient_div *= d_d2gaussians_dmuP(mean_model2,np.diag(var_model2),mean_model1,np.diag(var_model1))
 	model_gradient_div /= np.sqrt(d2gaussians(mean_model2,np.diag(var_model2),mean_model1,np.diag(var_model1)))

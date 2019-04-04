@@ -33,32 +33,32 @@ class GridworldContNormalEnv(gym.Env):
 	def reset(self):
 		
 		x,y = np.random.normal(loc=self.mean[0:2],scale=np.sqrt(self.var[0:2]))
-		if abs(x)>self.DIM/2 or abs(y)>self.DIM/2:
-			x = np.random.uniform(-2.5,2.5)
-			y = np.random.uniform(-2.5,2.5)
+		#if abs(x)>self.DIM/2 or abs(y)>self.DIM/2:
+		#	x = np.random.uniform(-2.5,2.5)
+		#	y = np.random.uniform(-2.5,2.5)
 
 		xg,yg = np.random.normal(loc=self.mean[2:4],scale=np.sqrt(self.var[2:4]))
-		if abs(xg)>self.DIM/2 or abs(yg)>self.DIM/2:
-			xg = np.random.uniform(-2.5,2.5)
-			yg = np.random.uniform(-2.5,2.5)
+		#if abs(xg)>self.DIM/2 or abs(yg)>self.DIM/2:
+		#	xg = np.random.uniform(-2.5,2.5)
+		#	yg = np.random.uniform(-2.5,2.5)
 
 		pos = np.array([x,y],dtype=np.float32)
 		dest = np.array([xg,yg],dtype=np.float32)
 
-		while self.check_end(pos,dest):
+		while self.check_end(pos,dest) or abs(x)>self.DIM/2 or abs(y)>self.DIM/2 or abs(xg)>self.DIM/2 or abs(yg)>self.DIM/2:
 			x,y = np.random.normal(loc=self.mean[0:2],scale=np.sqrt(self.var[0:2]))
-			if abs(x)>self.DIM/2 or abs(y)>self.DIM/2:
-				x = np.random.uniform(-2.5,2.5)
-				y = np.random.uniform(-2.5,2.5)
+			#if abs(x)>self.DIM/2 or abs(y)>self.DIM/2:
+			#	x = np.random.uniform(-2.5,2.5)
+			#	y = np.random.uniform(-2.5,2.5)
 
-			xg,yg = np.random.normal(loc=self.mean[0:2],scale=np.sqrt(self.var[0:2]))
-			if abs(xg)>self.DIM/2 or abs(yg)>self.DIM/2:
-				xg = np.random.uniform(-2.5,2.5)
-				yg = np.random.uniform(-2.5,2.5)
+			xg,yg = np.random.normal(loc=self.mean[2:4],scale=np.sqrt(self.var[2:4]))
+			#if abs(xg)>self.DIM/2 or abs(yg)>self.DIM/2:
+			#	xg = np.random.uniform(-2.5,2.5)
+			#	yg = np.random.uniform(-2.5,2.5)
 
 			pos = np.array([x,y],dtype=np.float32)
 			dest = np.array([xg,yg],dtype=np.float32)
-		
+
 		self.state = np.array([x,y,xg,yg],dtype=np.float32)
 		return self.state
 	
