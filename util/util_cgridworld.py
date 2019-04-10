@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from tkinter import *
 import time
 
-def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
+def build_cgridworld_features(mdp,state,transfMatrix=None,stateFeaturesMask=None):
 
 	D = mdp.DIM
 	ds = D/5
@@ -33,12 +33,14 @@ def build_cgridworld_features(mdp,state,stateFeaturesMask=None):
 	
 	state_features = np.ravel([asf,gsf])
 
-	if stateFeaturesMask is None:
-		return state_features
-	else:
+	if transfMatrix is not None:
+		state_features = np.dot(transfMatrix,state_features)
+
+	if stateFeaturesMask is not None:
 		mask = np.array(stateFeaturesMask, dtype=bool)
-		#assert(len(mask) == len(state_features))
-		return state_features[mask]
+		state_features = state_features[mask]
+	
+	return state_features
 			
 
 def draw_circle(x, y, r, canvas, **kwargs):
@@ -63,7 +65,8 @@ def draw_grid(canvas,DIM,mdp_dim):
 				draw_circle(DIM/2+i*(DIM/mdp_dim),DIM-(DIM/2+j*(DIM/mdp_dim)),2,canvas,fill="orange")
 
 
-def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
+def collect_cgridworld_episode(mdp,policy,horizon,transfMatrix=None,
+		stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
 
 	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
 	adim = policy.actionDim
@@ -90,11 +93,11 @@ def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportA
 
 		length += 1
 
-		state_features = build_cgridworld_features(mdp,state,stateFeaturesMask)
+		state_features = build_cgridworld_features(mdp,state,transfMatrix,stateFeaturesMask)
 		action = policy.draw_action(state_features)
 
 		if exportAllStateFeatures is True:
-			state_features = build_cgridworld_features(mdp,state)
+			state_features = build_cgridworld_features(mdp,state,transfMatrix)
 
 		newstate, reward, done = mdp.step(action)
 
@@ -144,7 +147,7 @@ def collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportA
 
 
 def collect_cgridworld_episodes(
-	mdp, policy, num_episodes, horizon,
+	mdp, policy, num_episodes, horizon, transfMatrix=None,
 	stateFeaturesMask=None, exportAllStateFeatures=True,
 	render=False, showProgress=False):
 
@@ -162,7 +165,7 @@ def collect_cgridworld_episodes(
 		bar = Bar('Collecting episodes', max=num_episodes)
 	
 	for i in range(num_episodes):
-		episode_data, length = collect_cgridworld_episode(mdp,policy,horizon,stateFeaturesMask,exportAllStateFeatures,render)
+		episode_data, length = collect_cgridworld_episode(mdp,policy,horizon,transfMatrix,stateFeaturesMask,exportAllStateFeatures,render)
 		data["state"][i] = episode_data["state"]
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
@@ -177,8 +180,9 @@ def collect_cgridworld_episodes(
 	return data
 
 
-def clearn(learner, steps, nEpisodes, sfmask=None, adamOptimizer=True, learningRate=0.1,
-		loadFile=None, saveFile=None, autosave=False, plotGradient=False):
+def clearn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None,
+		adamOptimizer=True, learningRate=0.1, loadFile=None, saveFile=None,
+		autosave=False, plotGradient=False):
 
 	if loadFile is not None:
 		learner.policy.params = np.load(loadFile)
@@ -206,7 +210,7 @@ def clearn(learner, steps, nEpisodes, sfmask=None, adamOptimizer=True, learningR
 
 		eps = collect_cgridworld_episodes(
 			learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,
-			stateFeaturesMask=sfmask,exportAllStateFeatures=False)
+			transfMatrix=transfMatrix, stateFeaturesMask=sfmask,exportAllStateFeatures=False)
 
 		gradient = learner.estimate_gradient(eps)
 		if adamOptimizer:

@@ -41,7 +41,7 @@ def build_taxi_features(mdp,observation):
 	return state_features
 
 
-def build_gridworld_features(mdp,observation,stateFeaturesMask=None):
+def build_gridworld_features(mdp,observation,transfMatrix=None,stateFeaturesMask=None):
 
 	lst = list(mdp.decode(observation))
 	row, col, row_g, col_g = lst[0], lst[1], lst[2], lst[3]
@@ -57,15 +57,19 @@ def build_gridworld_features(mdp,observation,stateFeaturesMask=None):
 	# constant term
 	state_features += [1]
 
-	if stateFeaturesMask is None:
-		return np.array(state_features)
-	else:
-		state_features = np.array(state_features)
+	state_features = np.array(state_features)
+	
+	if transfMatrix is not None:
+		state_features = np.dot(transfMatrix,state_features)
+
+	if stateFeaturesMask is not None:
 		mask = np.array(stateFeaturesMask, dtype=bool)
-		return state_features[mask]
+		state_features = state_features[mask]
+	
+	return state_features
 
 
-def collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
+def collect_gridworld_episode(mdp,policy,horizon,transfMatrix=None,stateFeaturesMask=None,exportAllStateFeatures=True,render=False):
 
 	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
 
@@ -83,11 +87,11 @@ def collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAl
 
 		length += 1
 
-		state_features = build_gridworld_features(mdp,state,stateFeaturesMask)
+		state_features = build_gridworld_features(mdp,state,transfMatrix,stateFeaturesMask)
 		action = policy.draw_action(state_features)
 
 		if exportAllStateFeatures is True:
-			state_features = build_gridworld_features(mdp,state)
+			state_features = build_gridworld_features(mdp,state,transfMatrix)
 
 		newstate, reward, done, _ = mdp.step(action)
 
@@ -111,7 +115,7 @@ def collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask=None,exportAl
 	return [episode_data,length]
 
 
-def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,stateFeaturesMask=None,exportAllStateFeatures=True,render=False,showProgress=False):
+def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,transfMatrix=None,stateFeaturesMask=None,exportAllStateFeatures=True,render=False,showProgress=False):
 	
 	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or stateFeaturesMask is None) else len(stateFeaturesMask)
 
@@ -126,7 +130,7 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,stateFeaturesMask
 		bar = Bar('Collecting episodes', max=num_episodes)
 
 	for i in range(num_episodes):
-		episode_data, length = collect_gridworld_episode(mdp,policy,horizon,stateFeaturesMask,exportAllStateFeatures,render)
+		episode_data, length = collect_gridworld_episode(mdp,policy,horizon,transfMatrix,stateFeaturesMask,exportAllStateFeatures,render)
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
 		data["r"][i] = episode_data["r"]
@@ -140,8 +144,8 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,stateFeaturesMask
 	return data
 
 
-def learn(learner, steps, nEpisodes, sfmask, adamOptimizer=True, learningRate=0.1,
-		loadFile=None, saveFile=None, autosave=False, plotGradient=False):
+def learn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None, adamOptimizer=True,
+		learningRate=0.1, loadFile=None, saveFile=None, autosave=False, plotGradient=False):
 
 	if loadFile is not None:
 		learner.policy.params = np.load(loadFile)
@@ -167,7 +171,7 @@ def learn(learner, steps, nEpisodes, sfmask, adamOptimizer=True, learningRate=0.
 	for step in range(steps):
 
 		eps = collect_gridworld_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,
-										stateFeaturesMask=sfmask,exportAllStateFeatures=False)
+				transfMatrix=transfMatrix,stateFeaturesMask=sfmask,exportAllStateFeatures=False)
 
 		gradient = learner.estimate_gradient(eps)
 		if adamOptimizer:
