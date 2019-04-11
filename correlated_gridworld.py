@@ -19,7 +19,7 @@ M = np.array([
 	[.5, .2, .3, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.], #0
 	[.1, .5, .4, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.], #1
 	[.3, .3, .4, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.], #2
-	[0., .4, 0., .6, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+	[0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
 	[0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
 	[0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
 	[0., 0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
@@ -55,7 +55,30 @@ super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
 
 N = 5000
 eps = collect_gridworld_episodes(mdp,agent_learner.policy,N,mdp.horizon,M,sfMask,exportAllStateFeatures=True,showProgress=True)
+
+stateFeaturesList = []
+for ep_s in eps["s"]:
+	for sf in ep_s:
+		found = False
+		for sf_list in stateFeaturesList:
+			if (sf==sf_list).all():
+				found = True
+				break
+		if not found:
+			stateFeaturesList.append(sf)
+
+stateFeaturesMatrix = np.array(stateFeaturesList)
+print(stateFeaturesMatrix.shape)
+
+# principal components
+u,s,vt = np.linalg.svd(stateFeaturesMatrix)
+v = vt.T
+
+for n,ep in enumerate(eps["s"]):
+	eps["s"][n] = np.dot(ep,v)
+
 optimizer = AdamOptimizer(super_learner.policy.paramsShape,learning_rate=0.3)
 estimated_params = super_learner.policy.estimate_params(eps,optimizer,None,epsilon=0.001,minSteps=150,maxSteps=300)
 
+estimated_params = np.dot(estimated_params,vt)
 print(estimated_params)
