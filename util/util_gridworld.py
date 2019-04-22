@@ -65,7 +65,6 @@ def build_gridworld_features(mdp,observation,transfMatrix=None,stateFeaturesMask
 	if stateFeaturesMask is not None:
 		mask = np.array(stateFeaturesMask, dtype=bool)
 		state_features = state_features[mask]
-	
 	return state_features
 
 
@@ -87,11 +86,11 @@ def collect_gridworld_episode(mdp,policy,horizon,transfMatrix=None,stateFeatures
 
 		length += 1
 
-		state_features = build_gridworld_features(mdp,state,transfMatrix,stateFeaturesMask)
+		state_features = build_gridworld_features(mdp,state,transfMatrix=transfMatrix,stateFeaturesMask=stateFeaturesMask)
 		action = policy.draw_action(state_features)
 
 		if exportAllStateFeatures is True:
-			state_features = build_gridworld_features(mdp,state,transfMatrix)
+			state_features = build_gridworld_features(mdp,state,transfMatrix=transfMatrix)
 
 		newstate, reward, done, _ = mdp.step(action)
 

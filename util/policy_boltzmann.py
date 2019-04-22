@@ -55,7 +55,18 @@ class BoltzmannPolicy(Policy):
 		return log_gradient
 	
 
-	def estimate_params(self, data, optimizer, params=None, epsilon=0.01, minSteps=50, maxSteps=0):
+	def compute_log(self, stateFeatures, action):
+
+		terms = np.dot(stateFeatures,self.params.T) # shape=(T,nA)
+		log = terms[np.arange(terms.shape[0]),action] # phi.T * theta
+		terms = np.exp(terms)
+		a_sum_terms = np.sum(terms,axis=1)
+		log -= np.log(a_sum_terms)
+		return np.sum(log)
+
+	
+
+	def estimate_params(self, data, optimizer, params=None, setToZero=None, epsilon=0.01, minSteps=50, maxSteps=0):
 
 		"""
 		Estimate the parameters of the policy with Maximum Likelihood given a set
@@ -68,6 +79,9 @@ class BoltzmannPolicy(Policy):
 			self.params = params
 		else:
 			self.params = np.zeros(shape=self.paramsShape)
+
+		if setToZero is not None:
+			self.params[:,setToZero] = 0
 		
 		flag = True
 		steps = 0
@@ -79,6 +93,9 @@ class BoltzmannPolicy(Policy):
 			for ep_n,ep_len in enumerate(data["len"]):
 				grad += np.sum(self.compute_log_gradient(data["s"][ep_n][0:ep_len],data["a"][ep_n][0:ep_len]),axis=0)
 			
+			if setToZero is not None:
+				grad[:,setToZero] = 0
+
 			update_step = optimizer.step(grad)
 			self.params = self.params + update_step
 			
@@ -89,9 +106,35 @@ class BoltzmannPolicy(Policy):
 				flag = False
 			if steps<minSteps:
 				flag = True
+		
+		if setToZero is not None:
+			self.params[:,setToZero] = 0
 
 		return self.params
 	
+
+	def getLogLikelihood(self, data, params=None):
+
+		if params is not None:
+			self.params = params
+		
+		eps_s = data["s"]
+		eps_a = data["a"]
+		eps_len = data["len"]
+
+		log_likelihood = 0
+
+		for n,T in enumerate(eps_len):
+			sf_episode = eps_s[n]
+			a_episode = eps_a[n]
+
+			log_likelihood += self.compute_log(sf_episode,a_episode)
+		
+		return log_likelihood
+
+
+
+
 
 	def getAnalyticalFisherInformation(self, data):
 		
