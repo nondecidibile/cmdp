@@ -1,5 +1,6 @@
 import numpy as np
 from util.optimizer import *
+from util.policy_gaussian import *
 from progress.bar import Bar
 import matplotlib.pyplot as plt
 from tkinter import *
@@ -280,3 +281,33 @@ def d_d2gaussians_dmuP(muP,covP,muQ,covQ):
 	t1 = d2gaussians(muP,covP,muQ,covQ)
 	t2 = (muP-muQ).T.dot(invA) + (muP-muQ).T.dot(invA.T)
 	return t1*t2
+
+def lrTest(eps,sfMask,nsf=50,na=2,lr=0.3,epsilon=0.001,maxSteps=1000):
+
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask)+1)
+	super_policy = GaussianPolicy(nStateFeatures=nsf,actionDim=na)
+
+	optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=lr)
+	params = super_policy.estimate_params(eps,optimizer,setToZero=None,epsilon=epsilon,minSteps=100,maxSteps=maxSteps,printInfo=False)
+	ll = super_policy.getLogLikelihood(eps,params)
+	bar.next()
+
+	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
+	for param in range(nsf):
+		if sfMask[param]:
+			optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=lr)
+			params_h0 = super_policy.estimate_params(eps,optimizer,setToZero=param,epsilon=epsilon,minSteps=100,maxSteps=maxSteps,printInfo=False)
+			ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
+			bar.next()
+	
+	bar.finish()
+
+	#print(ll)
+	#print(ll_h0)
+	lr_lambda = -2*(ll_h0 - ll)
+
+	for param in range(nsf):
+		if lr_lambda[param] > 9.4877:
+			sfMask[param] = False
+	
+	return lr_lambda

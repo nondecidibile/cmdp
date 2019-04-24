@@ -30,23 +30,23 @@ learn(
 	plotGradient=False
 )
 
-N = 10000
+N = 1000
 eps = collect_gridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
 super_policy = BoltzmannPolicy(17,4)
 
 optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
-params = super_policy.estimate_params(eps,optimizer,setToZero=None,epsilon=0.01,minSteps=100,maxSteps=250)
-
-optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
-params_0 = super_policy.estimate_params(eps,optimizer,setToZero=0,epsilon=0.01,minSteps=100,maxSteps=250)
-
-optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
-params_8 = super_policy.estimate_params(eps,optimizer,setToZero=8,epsilon=0.01,minSteps=100,maxSteps=250)
-
+params = super_policy.estimate_params(eps,optimizer,setToZero=None,epsilon=0.001,minSteps=100,maxSteps=1000)
 ll = super_policy.getLogLikelihood(eps,params)
+
+ll_h0 = np.zeros(shape=(16),dtype=np.float32)
+for param in range(16):
+	optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
+	params_h0 = super_policy.estimate_params(eps,optimizer,setToZero=param,epsilon=0.001,minSteps=100,maxSteps=1000)
+	ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
+
 print(ll)
-ll_0 = super_policy.getLogLikelihood(eps,params_0)
-print(ll_0)
-ll_8 = super_policy.getLogLikelihood(eps,params_8)
-print(ll_8)
+print(ll_h0)
+for param in range(16):
+	lr_lambda = -2*(ll_h0[param] - ll)
+	print(param,"-",lr_lambda)

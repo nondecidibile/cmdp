@@ -133,9 +133,6 @@ class BoltzmannPolicy(Policy):
 		return log_likelihood
 
 
-
-
-
 	def getAnalyticalFisherInformation(self, data):
 		
 		eps_s = data["s"]
