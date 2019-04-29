@@ -1,33 +1,94 @@
 import numpy as np
+import scipy as sp
 from gym.envs.toy_text import gridworld_cont
+from gym.envs.toy_text import gridworld_cont_normal
 from util.util_cgridworld import *
 from util.policy_gaussian import *
 from util.learner import *
+import sys
 
-mdp = gridworld_cont.GridworldContEnv()
-mdp.horizon = 50
+np.set_printoptions(precision=6)
+np.set_printoptions(suppress=True)
+
+meanModel = [-2,-2,2,2]
+varModel = [0.1,0.1,0.5,0.5]
 
 sfMask = np.ones(shape=50,dtype=bool) # state features mask
 sfMask[40:50] = False
 
-agent_policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
-agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
-
-clearn(
-	agent_learner,
-	steps=0,
-	nEpisodes=500,
-	sfmask=sfMask,
-	loadFile="cparams40.npy",
-	saveFile=None,
-	autosave=True,
-	plotGradient=False
-)
+super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
+super_learner = GpomdpLearner(None,super_policy,gamma=0.98)
 
 sfTestMask = np.ones(shape=50,dtype=np.bool) # State features not rejected
+'''
+sfBestModels = []
+for sf in range(50):
+	sfBestModels.append([meanModel.copy(),0])
+'''
 
-N = 1000
-eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
+#
+# Cycle ENVIRONMENT CONFIGURATION
+#
+for configuration_index in range(1000):
 
-lr_lambda = lrTest(eps,sfTestMask,lr=0.3,epsilon=0.001,maxSteps=1000)
-print(lr_lambda)
+	print("Using MDP with mean =",meanModel)
+	mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=meanModel,var=varModel)
+	mdp.horizon = 50
+	#mdp_uniform = gridworld_cont.GridworldContEnv()
+	#mdp_uniform.horizon = 50
+
+	agent_policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
+	agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
+
+	clearn(
+		agent_learner,
+		steps=50,
+		nEpisodes=100,
+		sfmask=sfMask,
+		loadFile=None,
+		saveFile=None,
+		autosave=True,
+		printInfo=False
+	)
+
+	super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
+	super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
+
+	N = 1000
+	eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
+	#eps_uniform = collect_cgridworld_episodes(mdp_uniform,agent_learner.policy,N,mdp.horizon,stateFeaturesMask=sfMask,exportAllStateFeatures=True,showProgress=True)
+
+	# Test parameter for model optimization
+	sfTestMaskIndices = np.where(sfTestMask == True)
+	testParamIndex = sfTestMaskIndices[0][0]
+	sfLrTestMask = np.zeros(shape=50,dtype=np.bool)
+	sfLrTestMask[testParamIndex] = True
+	lr_lambda = lrTest(eps,sfLrTestMask,lr=0.3,epsilon=0.001,maxSteps=1000)
+	sfTestMask[testParamIndex] = sfLrTestMask[testParamIndex]
+	print("Feature",testParamIndex,"- LR lambda =",lr_lambda[testParamIndex])
+
+	# Choose next parameter for model optimization
+	sfTestMaskIndices = np.where(sfTestMask == True)
+	sfGradientMask = np.zeros(shape=50,dtype=np.bool)
+	sfGradientMask[sfTestMaskIndices[0][0]] = True
+	print("Configuring model to test parameter",sfTestMaskIndices[0][0])
+
+	meanModel2 = meanModel.copy() #sfBestModels[sfTestMaskIndices[0][0]][0]
+	meanModel2[0] -= 0.05
+	meanModel2[1] += 0.05
+	meanModel2[2] -= 0.05
+	meanModel2[3] += 0.05
+	varModel2 = varModel.copy()
+
+	modelOptimizer = AdamOptimizer(shape=4,learning_rate=0.01)
+	for _i in range(150):
+		modelGradient = getModelGradient(super_learner,eps,sfGradientMask,meanModel,varModel,meanModel2,varModel2)
+		meanModel2 += modelOptimizer.step(modelGradient)
+		#print("MODEL:",meanModel2,"\n")
+	'''
+	#updateSfBestModels(super_learner,eps,sfBestModels,meanModel,varModel,meanModel2,varModel2)
+	#sfBestModels[sfTestMaskIndices[0][0]][0] = meanModel2.copy()
+	'''
+
+	meanModel = meanModel2.copy()
+	varModel = varModel2.copy()

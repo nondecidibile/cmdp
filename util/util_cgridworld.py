@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 from util.optimizer import *
 from util.policy_gaussian import *
 from progress.bar import Bar
@@ -183,7 +184,7 @@ def collect_cgridworld_episodes(
 
 def clearn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None,
 		adamOptimizer=True, learningRate=0.1, loadFile=None, saveFile=None,
-		autosave=False, plotGradient=False):
+		autosave=False, plotGradient=False, printInfo=True):
 
 	if loadFile is not None:
 		learner.policy.params = np.load(loadFile)
@@ -221,23 +222,24 @@ def clearn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None,
 
 		learner.policy.params += update_step
 
-		print("Step: "+str(step))
 		mean_length = np.mean(eps["len"])
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
 		avg_mean_length_t = avg_mean_length/(1-mt)
-		print("Mean length: "+str(np.round(mean_length,3)))
 		#print("Average mean length: "+str(np.round(avg_mean_length_t,3)))
 		max_gradient = np.max(np.abs(gradient))
 		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
 		avg_max_gradient_t = avg_max_gradient/(1-mt)
-		print("Maximum gradient: "+str(np.round(max_gradient,5)))
 		#print("Avg maximum gradient: "+str(np.round(avg_max_gradient_t,5)))
 		mean_gradient = np.mean(np.abs(gradient))
 		avg_mean_gradient = avg_mean_gradient*avg+mean_gradient*(1-avg)
 		avg_mean_gradient_t = avg_mean_gradient/(1-mt)
-		mt = mt*avg
-		print("Mean gradient: "+str(np.round(mean_gradient,5)))
 		#print("Avg mean gradient: "+str(np.round(avg_mean_gradient_t,5))+"\n")
+		mt = mt*avg
+		if printInfo:
+			print("Step: "+str(step))
+			print("Mean length: "+str(np.round(mean_length,3)))
+			print("Mean gradient: "+str(np.round(mean_gradient,5)))
+			print("Maximum gradient: "+str(np.round(max_gradient,5)))
 
 		if plotGradient:
 			xs.append(step)
@@ -281,6 +283,68 @@ def d_d2gaussians_dmuP(muP,covP,muQ,covQ):
 	t1 = d2gaussians(muP,covP,muQ,covQ)
 	t2 = (muP-muQ).T.dot(invA) + (muP-muQ).T.dot(invA.T)
 	return t1*t2
+
+def getModelGradient(superLearner, eps, sfGradientMask, meanModel, varModel, meanModel2, varModel2):
+
+	sfGradientMaskTiled = np.tile(sfGradientMask,(2,1))
+	sfGradientMaskLin = np.ravel(sfGradientMaskTiled)
+
+	# importance sampling
+	initialStates = eps["state"][:,0]
+	N1 = sp.stats.multivariate_normal(mean=meanModel,cov=np.diag(varModel))
+	N2 = sp.stats.multivariate_normal(mean=meanModel2,cov=np.diag(varModel2))
+	initialIS = N2.pdf(initialStates) / N1.pdf(initialStates)
+	estimated_gradient2 = superLearner.estimate_gradient(eps,initialIS)
+
+	# norm^2_2 of the gradient of J
+	#x = np.linalg.norm(estimated_gradient2[sfGradientMaskTiled])**2
+
+	grads_estimates = superLearner.estimate_gradient(eps,getEstimates=True)
+	dj = np.ravel(estimated_gradient2)
+
+	ddj = np.zeros(shape=(len(eps["len"]),len(meanModel2),len(sfGradientMaskLin)),dtype=np.float32)
+	for n in range(len(eps["len"])):
+		hx1 = (initialStates[n]-meanModel2)/varModel2
+		kx1 = grads_estimates[n]
+		ddj[n] = np.outer(hx1,kx1)
+	ddj = (ddj.T*initialIS).T
+	ddj = np.sum(ddj,axis=0)/len(eps["len"])
+
+	dj = dj[sfGradientMaskLin]
+	ddj = ddj[:,sfGradientMaskLin]
+	model_gradient_J = np.matmul(ddj,dj)
+
+	# ranyi divergence term
+	lambda_param = 1/1000000 * np.linalg.norm(estimated_gradient2,ord=np.inf)*np.sqrt(np.count_nonzero(sfGradientMaskLin)/0.95)
+	#print("lambda =",lambda_param)
+	#print("d2 = ",d2gaussians(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel)))
+	#print("weights = ",np.mean(initialIS**2))
+
+	model_gradient_div = lambda_param/2/np.sqrt(len(eps["len"]))
+	model_gradient_div *= d_d2gaussians_dmuP(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel))
+	model_gradient_div /= np.sqrt(d2gaussians(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel)))
+
+	model_gradient = model_gradient_J - model_gradient_div
+	#print("norm_2^2(grad J) =",x)
+	#print("model gradient [J] =",model_gradient_J)
+	#print("model gradient [div] =",model_gradient_div)
+	#print("model gradient =",model_gradient)
+	return model_gradient
+
+def updateSfBestModels(superLearner,eps,sfBestModels,meanModel,varModel,meanModel2,varModel2):
+	
+	# importance sampling
+	initialStates = eps["state"][:,0]
+	N1 = sp.stats.multivariate_normal(mean=meanModel,cov=np.diag(varModel))
+	N2 = sp.stats.multivariate_normal(mean=meanModel2,cov=np.diag(varModel2))
+	initialIS = N2.pdf(initialStates) / N1.pdf(initialStates)
+	estimated_gradient2 = superLearner.estimate_gradient(eps,initialIS)
+
+	for i in range(len(sfBestModels)):
+		grad2 = np.max(estimated_gradient2[:,i]**2)
+		if grad2 > sfBestModels[i][1]:
+			sfBestModels[i][1] = grad2
+			sfBestModels[i][0] = meanModel2.copy()
 
 def lrTest(eps,sfMask,nsf=50,na=2,lr=0.3,epsilon=0.001,maxSteps=1000):
 
