@@ -10,7 +10,7 @@ import sys
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-meanModel = [-2,-2,2,2]
+meanModel = [0,0,2,2]
 varModel = [0.1,0.1,0.5,0.5]
 
 sfMask = np.ones(shape=50,dtype=bool) # state features mask
@@ -20,6 +20,7 @@ super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
 super_learner = GpomdpLearner(None,super_policy,gamma=0.98)
 
 sfTestMask = np.ones(shape=50,dtype=np.bool) # State features not rejected
+#sfTestMask[0:25] = False
 '''
 sfBestModels = []
 for sf in range(50):
@@ -42,8 +43,8 @@ for configuration_index in range(1000):
 
 	clearn(
 		agent_learner,
-		steps=50,
-		nEpisodes=100,
+		steps=100,
+		nEpisodes=250,
 		sfmask=sfMask,
 		loadFile=None,
 		saveFile=None,
@@ -54,18 +55,13 @@ for configuration_index in range(1000):
 	super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
 	super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
 
-	N = 1000
+	N = 5000
 	eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
-	#eps_uniform = collect_cgridworld_episodes(mdp_uniform,agent_learner.policy,N,mdp.horizon,stateFeaturesMask=sfMask,exportAllStateFeatures=True,showProgress=True)
 
-	# Test parameter for model optimization
-	sfTestMaskIndices = np.where(sfTestMask == True)
-	testParamIndex = sfTestMaskIndices[0][0]
-	sfLrTestMask = np.zeros(shape=50,dtype=np.bool)
-	sfLrTestMask[testParamIndex] = True
-	lr_lambda = lrTest(eps,sfLrTestMask,lr=0.3,epsilon=0.001,maxSteps=1000)
-	sfTestMask[testParamIndex] = sfLrTestMask[testParamIndex]
-	print("Feature",testParamIndex,"- LR lambda =",lr_lambda[testParamIndex])
+	# Test parameters
+	lr_lambda = lrTest(eps,sfTestMask,lr=0.03,epsilon=0.001,maxSteps=1000)
+	print(sfTestMask)
+	print(lr_lambda)
 
 	# Choose next parameter for model optimization
 	sfTestMaskIndices = np.where(sfTestMask == True)

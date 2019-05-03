@@ -67,7 +67,7 @@ class GaussianPolicy(Policy):
 		return sumterms - action.shape[0]*0.5*np.log(4*(np.pi**2)*covdet)
 	
 
-	def estimate_params(self, data, optimizer, params=None, setToZero=None, epsilon=0.01, minSteps=50, maxSteps=0, printInfo=True):
+	def estimate_params(self, data, setToZero=None):
 
 		"""
 		Estimate the parameters of the policy with Maximum Likelihood given a set
@@ -75,42 +75,26 @@ class GaussianPolicy(Policy):
 
 		Return when the values stops improving, i.e. ||new_params-params||<epsilon
 		"""
-
-		if params is not None:
-			self.params = params
-		else:
-			self.params = np.zeros(shape=self.paramsShape)
 		
+		n = np.sum(data["len"])
+
+		X = np.zeros(shape=(n,self.nStateFeatures),dtype=np.float32)
+		A = np.zeros(shape=(n,self.actionDim),dtype=np.float32)
+
+		i = 0
+		for ep_n,ep_len in enumerate(data["len"]):
+			X[i:i+ep_len] = data["s"][ep_n][0:ep_len]
+			A[i:i+ep_len] = data["a"][ep_n][0:ep_len]
+			i += ep_len
+
 		if setToZero is not None:
-			self.params[:,setToZero] = 0
+			X = np.delete(X,setToZero,1)
 		
-		flag = True
-		steps = 0
+		self.params = np.dot(np.dot(np.linalg.inv(np.dot(X.T,X)),X.T),A).T
 
-		while flag:
-		
-			grad = np.zeros(shape=self.paramsShape, dtype=np.float32)
-
-			for ep_n,ep_len in enumerate(data["len"]):
-				grad += np.sum(self.compute_log_gradient(data["s"][ep_n][0:ep_len],data["a"][ep_n][0:ep_len]),axis=0)
-			
-			if setToZero is not None:
-				grad[:,setToZero] = 0
-
-			update_step = optimizer.step(grad)
-			self.params = self.params + update_step
-			update_size = np.abs(np.max(np.ravel(np.asarray(update_step))))
-			if printInfo:
-				print(steps," - Update size :",update_size)
-			steps += 1
-			if update_size<epsilon or steps>maxSteps:
-				flag = False
-			if steps<minSteps:
-				flag = True
-		
 		if setToZero is not None:
-			self.params[:,setToZero] = 0
-		
+			self.params = np.insert(self.params,setToZero,0,1)
+
 		return self.params
 	
 

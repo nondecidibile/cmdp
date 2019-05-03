@@ -346,21 +346,19 @@ def updateSfBestModels(superLearner,eps,sfBestModels,meanModel,varModel,meanMode
 			sfBestModels[i][1] = grad2
 			sfBestModels[i][0] = meanModel2.copy()
 
-def lrTest(eps,sfMask,nsf=50,na=2,lr=0.3,epsilon=0.001,maxSteps=1000):
+def lrTest(eps,sfMask,nsf=50,na=2,lr=0.03,epsilon=0.001,maxSteps=1000):
 
 	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask)+1)
 	super_policy = GaussianPolicy(nStateFeatures=nsf,actionDim=na)
 
-	optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=lr)
-	params = super_policy.estimate_params(eps,optimizer,setToZero=None,epsilon=epsilon,minSteps=100,maxSteps=maxSteps,printInfo=False)
+	params = super_policy.estimate_params(eps,setToZero=None)
 	ll = super_policy.getLogLikelihood(eps,params)
 	bar.next()
 
 	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
 	for param in range(nsf):
 		if sfMask[param]:
-			optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=lr)
-			params_h0 = super_policy.estimate_params(eps,optimizer,setToZero=param,epsilon=epsilon,minSteps=100,maxSteps=maxSteps,printInfo=False)
+			params_h0 = super_policy.estimate_params(eps,setToZero=param)
 			ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
 			bar.next()
 	
