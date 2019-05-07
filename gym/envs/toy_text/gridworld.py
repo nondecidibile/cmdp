@@ -5,151 +5,145 @@ from gym.envs.toy_text import discrete
 import numpy as np
 
 MAP = [
-    "╔═════════╗",
-    "║ · · · · ║",
-    "║ · · · · ║",
-    "║ · · · · ║",
-    "║ · · · · ║",
-    "║ · · · · ║",
-    "╚═════════╝",
+	"╔═════════╗",
+	"║ · · · · ║",
+	"║ · · · · ║",
+	"║ · · · · ║",
+	"║ · · · · ║",
+	"║ · · · · ║",
+	"╚═════════╝",
 ]
 
 
 class GridworldEnv(discrete.DiscreteEnv):
-    """
-    Gridworld
-    
-    Actions: 
-    There are 4 discrete deterministic actions:
-    - 0: move UP
-    - 1: move DOWN
-    - 2: move LEFT
-    - 3: move RIGHT 
-    
-    Rewards: 
-    There is a reward of -1 for each action.
-    
-    Rendering:
-    - yellow: agent
-    - blue 'G': destination
-    """
-    metadata = {'render.modes': ['human', 'ansi']}
+	"""
+	Gridworld
+	
+	Actions: 
+	There are 4 discrete deterministic actions:
+	- 0: move UP
+	- 1: move DOWN
+	- 2: move LEFT
+	- 3: move RIGHT 
+	
+	Rewards: 
+	There is a reward of -1 for each action.
+	
+	Rendering:
+	- yellow: agent
+	- blue 'G': destination
+	"""
+	metadata = {'render.modes': ['human', 'ansi']}
 
-    def __init__(self, changeProb=0.0, targetRow=-1, targetCol=-1):
-        self.desc = np.asarray(MAP,dtype='U')
+	def __init__(self, wpr=None, wpc=None, wgr=None, wgc=None):
+		self.desc = np.asarray(MAP,dtype='U')
 
-        nS = 625
-        nR = 5
-        nC = 5
-        maxR = nR-1
-        maxC = nC-1
-        isd = np.zeros(nS)
-        nA = 4
-        P = {s : {a : [] for a in range(nA)} for s in range(nS)}
+		nS = 625
+		nR = 5
+		nC = 5
+		maxR = nR-1
+		maxC = nC-1
+		isd = np.zeros(nS)
+		nA = 4
+		P = {s : {a : [] for a in range(nA)} for s in range(nS)}
 
-        if changeProb<0:
-            changeProb = 0
-        if changeProb>1:
-            changeProb = 1
-        
-        if changeProb>0:
-            if targetRow==-1 and targetCol==-1:
-                print("Error in Gridworld::__init__, no target row or column specified.")
-                changeProb = 0
-            if targetRow!=-1 and targetCol!=-1:
-                print("Error in Gridworld::__init__, you can only specify one row or one column.")
-                changeProb = 0
-        
-        if changeProb>0:
-            if targetCol!=-1:
-                targetCol = np.int32(np.clip(targetCol,0,maxC))
-            if targetRow!=-1:
-                targetRow = np.int32(np.clip(targetRow,0,maxR))
+		self.w_pr = np.zeros(5,dtype=np.float32) if wpr is None else np.array(wpr)
+		self.w_pc = np.zeros(5,dtype=np.float32) if wpc is None else np.array(wpc)
+		self.w_gr = np.zeros(5,dtype=np.float32) if wgr is None else np.array(wgr)
+		self.w_gc = np.zeros(5,dtype=np.float32) if wgc is None else np.array(wgc)
 
-        for row in range(5):
-            for col in range(5):
-                for row_g in range(5):
-                    for col_g in range(5):
-                        state = self.encode(row, col, row_g, col_g)
-                        if (row, col) != (row_g, col_g):
-                            if changeProb==0:
-                                prob = 1/25
-                            else:
-                                if targetCol!=-1:
-                                    if col_g==targetCol:
-                                        prob = changeProb/5
-                                    else:
-                                        prob = (1-changeProb)/20
-                                elif targetRow!=-1:
-                                    if row_g==targetRow:
-                                        prob = changeProb/5
-                                    else:
-                                        prob = (1-changeProb)/20
-                            isd[state] += prob
-                        for a in range(nA):
-                            # defaults
-                            newrow, newcol = row, col
-                            reward = -1
-                            done = False
+		for row in range(5):
+			for col in range(5):
+				for row_g in range(5):
+					for col_g in range(5):
+						state = self.encode(row, col, row_g, col_g)
+						#if (row, col) != (row_g, col_g):
+						prob = self.initialProb(row,col,row_g,col_g)
+						isd[state] += prob
+						for a in range(nA):
+							# defaults
+							newrow, newcol = row, col
+							reward = -1
+							done = False
 
-                            if a==0:
-                                newrow = max(row-1, 0)
-                            elif a==1:
-                                newrow = min(row+1, maxR)
-                            elif a==2:
-                                newcol = max(col-1, 0)
-                            elif a==3:
-                                newcol = min(col+1, maxC)
-                            
-                            if (newrow, newcol) == (row_g, col_g):
-                                done = True
-                            
-                            newstate = self.encode(newrow, newcol, row_g, col_g)
-                            P[state][a].append((1.0, newstate, reward, done))
+							if a==0:
+								newrow = max(row-1, 0)
+							elif a==1:
+								newrow = min(row+1, maxR)
+							elif a==2:
+								newcol = max(col-1, 0)
+							elif a==3:
+								newcol = min(col+1, maxC)
+							
+							if (newrow, newcol) == (row_g, col_g):
+								done = True
+							
+							newstate = self.encode(newrow, newcol, row_g, col_g)
+							P[state][a].append((1.0, newstate, reward, done))
 
-        discrete.DiscreteEnv.__init__(self, nS, nA, P, isd)
+		discrete.DiscreteEnv.__init__(self, nS, nA, P, isd)
+	
+	def initialProb(self, agentrow, agentcol, goalrow, goalcol):
+		p_r = np.exp(self.w_pr[agentrow])/np.sum(np.exp(self.w_pr))
+		p_c = np.exp(self.w_pc[agentcol])/np.sum(np.exp(self.w_pc))
+		p_gr = np.exp(self.w_gr[goalrow])/np.sum(np.exp(self.w_gr))
+		p_gc = np.exp(self.w_gc[goalcol])/np.sum(np.exp(self.w_gc))
+		return p_r * p_c * p_gr * p_gc
+	
+	def dInitialProb_dw(self, state):
+		row,col,row_g,col_g = self.decode(state)
+		dw_pr = -np.exp(self.w_pr)/np.sum(np.exp(self.w_pr))
+		dw_pr[row] += 1
+		dw_pc = -np.exp(self.w_pc)/np.sum(np.exp(self.w_pc))
+		dw_pc[col] += 1
+		dw_gr = -np.exp(self.w_gr)/np.sum(np.exp(self.w_gr))
+		dw_gr[row_g] += 1
+		dw_gc = -np.exp(self.w_gc)/np.sum(np.exp(self.w_gc))
+		dw_gc[col_g] += 1
+		return np.array([dw_pr,dw_pc,dw_gr,dw_gc])
 
-    def encode(self, agentrow, agentcol, goalrow, goalcol):
-        # (5) 5, 5, 5
-        i = agentrow
-        i *= 5
-        i += agentcol
-        i *= 5
-        i += goalrow
-        i *= 5
-        i += goalcol
-        return i
 
-    def decode(self, i):
-        out = []
-        out.append(i % 5)
-        i = i // 5
-        out.append(i % 5)
-        i = i // 5
-        out.append(i % 5)
-        i = i // 5
-        out.append(i)
-        assert 0 <= i < 5
-        return reversed(out)
+	def encode(self, agentrow, agentcol, goalrow, goalcol):
+		# (5) 5, 5, 5
+		i = agentrow
+		i *= 5
+		i += agentcol
+		i *= 5
+		i += goalrow
+		i *= 5
+		i += goalcol
+		return i
 
-    def render(self, mode='human'):
-        outfile = StringIO() if mode == 'ansi' else sys.stdout
+	def decode(self, i):
+		out = []
+		out.append(i % 5)
+		i = i // 5
+		out.append(i % 5)
+		i = i // 5
+		out.append(i % 5)
+		i = i // 5
+		out.append(i)
+		assert 0 <= i < 5
+		return reversed(out)
 
-        out = self.desc.copy().tolist()
-        out = [[c for c in line] for line in out]
-        agentrow, agentcol, goalrow, goalcol = self.decode(self.s)
-        def ul(x): return "_" if x == " " else x
-        out[1+agentrow][2*agentcol+1] = utils.colorize(' ', 'yellow', bold=True, highlight=True)
-        out[1+goalrow][2*goalcol+1] = utils.colorize('G', 'blue', bold=True, highlight=True)
+	def render(self, mode='human'):
+		outfile = StringIO() if mode == 'ansi' else sys.stdout
 
-        if (agentrow, agentcol) == (goalrow, goalcol):
-            out[1+agentrow][2*agentcol+1] = utils.colorize('G', 'yellow', bold=True, highlight=True)
+		out = self.desc.copy().tolist()
+		out = [[c for c in line] for line in out]
+		agentrow, agentcol, goalrow, goalcol = self.decode(self.s)
+		def ul(x): return "_" if x == " " else x
+		out[1+agentrow][2*agentcol+1] = utils.colorize(' ', 'yellow', bold=True, highlight=True)
+		out[1+goalrow][2*goalcol+1] = utils.colorize('G', 'blue', bold=True, highlight=True)
 
-        outfile.write("\n".join(["".join(row) for row in out])+"\n")
-        if self.lastaction is not None:
-            outfile.write("  ({})\n".format(["UP", "DOWN", "LEFT", "RIGHT"][self.lastaction]))
-        else: outfile.write("\n")
+		if (agentrow, agentcol) == (goalrow, goalcol):
+			out[1+agentrow][2*agentcol+1] = utils.colorize('G', 'yellow', bold=True, highlight=True)
 
-        # No need to return anything for human
-        if mode != 'human':
-            return outfile
+		outfile.write("\n".join(["".join(row) for row in out])+"\n")
+		if self.lastaction is not None:
+			outfile.write("  ({})\n".format(["UP", "DOWN", "LEFT", "RIGHT"][self.lastaction]))
+		else: outfile.write("\n")
+
+		# No need to return anything for human
+		if mode != 'human':
+			return outfile

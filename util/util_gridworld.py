@@ -77,6 +77,7 @@ def collect_gridworld_episode(mdp,policy,horizon,transfMatrix=None,stateFeatures
 	rewards = np.zeros(shape=horizon,dtype=np.int32)
 
 	state = mdp.reset()
+	initialState = np.copy(state)
 	if render:
 		mdp.render()
 
@@ -110,7 +111,7 @@ def collect_gridworld_episode(mdp,policy,horizon,transfMatrix=None,stateFeatures
 		
 		state = newstate
 	
-	episode_data = {"s": states,"a": actions,"r": rewards}
+	episode_data = {"s": states,"a": actions,"r": rewards, "s0": initialState}
 	return [episode_data,length]
 
 
@@ -121,8 +122,9 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,transfMatrix=None
 	data_s = np.zeros(shape=(num_episodes,horizon,nsf),dtype=np.float32)
 	data_a = np.zeros(shape=(num_episodes,horizon),dtype=np.int32)
 	data_r = np.zeros(shape=(num_episodes,horizon),dtype=np.int32)
+	data_s0 = np.zeros(shape=num_episodes,dtype=np.int32)
 	data_len = np.zeros(shape=num_episodes, dtype=np.int32)
-	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len}
+	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len, "s0": data_s0}
 
 	mean_length = 0
 	if showProgress:
@@ -133,6 +135,7 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,transfMatrix=None
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
 		data["r"][i] = episode_data["r"]
+		data["s0"][i] = episode_data["s0"]
 		data["len"][i] = length
 		if showProgress:
 			bar.next()

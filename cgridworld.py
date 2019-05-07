@@ -55,7 +55,7 @@ for configuration_index in range(1000):
 	super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
 	super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
 
-	N = 5000
+	N = 2500
 	eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
 	# Test parameters

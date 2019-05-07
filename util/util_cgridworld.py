@@ -369,7 +369,7 @@ def lrTest(eps,sfMask,nsf=50,na=2,lr=0.03,epsilon=0.001,maxSteps=1000):
 	lr_lambda = -2*(ll_h0 - ll)
 
 	for param in range(nsf):
-		if lr_lambda[param] > 9.4877:
+		if lr_lambda[param] > 9.2103:
 			sfMask[param] = False
 	
 	return lr_lambda

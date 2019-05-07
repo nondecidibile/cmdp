@@ -6,8 +6,12 @@ from util.optimizer import *
 from util.policy_boltzmann import *
 from util.util_gridworld import *
 
+w_row = [5,3,2,1,0.5]
+w_col = [5,3,2,1,0.5]
+w_grow = [0.5,1,2,3,5]
+w_gcol = [0.5,1,2,3,5]
 
-mdp = gridworld.GridworldEnv()
+mdp = gridworld.GridworldEnv(w_row,w_col,w_grow,w_gcol)
 mdp.horizon = 50
 
 
@@ -15,16 +19,16 @@ mdp.horizon = 50
 # Learning without some state features
 #
 
-sfMask = np.array([1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1],dtype=bool) # state features mask
+sfMask = np.array([1,1,1,1, 1,1,1,1, 0,1,1,1, 1,1,1,1, 1],dtype=bool) # state features mask
 agent_policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
 agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
 
 learn(
 	learner=agent_learner,
-	steps=0,
-	nEpisodes=1000,
+	steps=100,
+	nEpisodes=250,
 	sfmask=sfMask,
-	loadFile="params8.npy",
+	loadFile=None,
 	saveFile=None,
 	autosave=True,
 	plotGradient=False
