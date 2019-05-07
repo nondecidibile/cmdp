@@ -35,7 +35,7 @@ class GridworldEnv(discrete.DiscreteEnv):
 	"""
 	metadata = {'render.modes': ['human', 'ansi']}
 
-	def __init__(self, wpr=None, wpc=None, wgr=None, wgc=None):
+	def __init__(self, model=None):
 		self.desc = np.asarray(MAP,dtype='U')
 
 		nS = 625
@@ -47,10 +47,10 @@ class GridworldEnv(discrete.DiscreteEnv):
 		nA = 4
 		P = {s : {a : [] for a in range(nA)} for s in range(nS)}
 
-		self.w_pr = np.zeros(5,dtype=np.float32) if wpr is None else np.array(wpr)
-		self.w_pc = np.zeros(5,dtype=np.float32) if wpc is None else np.array(wpc)
-		self.w_gr = np.zeros(5,dtype=np.float32) if wgr is None else np.array(wgr)
-		self.w_gc = np.zeros(5,dtype=np.float32) if wgc is None else np.array(wgc)
+		self.w_pr = np.zeros(5,dtype=np.float32) if model is None else model[0]
+		self.w_pc = np.zeros(5,dtype=np.float32) if model is None else model[1]
+		self.w_gr = np.zeros(5,dtype=np.float32) if model is None else model[2]
+		self.w_gc = np.zeros(5,dtype=np.float32) if model is None else model[3]
 
 		for row in range(5):
 			for col in range(5):
@@ -90,16 +90,15 @@ class GridworldEnv(discrete.DiscreteEnv):
 		p_gc = np.exp(self.w_gc[goalcol])/np.sum(np.exp(self.w_gc))
 		return p_r * p_c * p_gr * p_gc
 	
-	def dInitialProb_dw(self, state):
-		row,col,row_g,col_g = self.decode(state)
+	def dInitialProb_dw(self, agentrow, agentcol, goalrow, goalcol):
 		dw_pr = -np.exp(self.w_pr)/np.sum(np.exp(self.w_pr))
-		dw_pr[row] += 1
+		dw_pr[agentrow] += 1
 		dw_pc = -np.exp(self.w_pc)/np.sum(np.exp(self.w_pc))
-		dw_pc[col] += 1
+		dw_pc[agentcol] += 1
 		dw_gr = -np.exp(self.w_gr)/np.sum(np.exp(self.w_gr))
-		dw_gr[row_g] += 1
+		dw_gr[goalrow] += 1
 		dw_gc = -np.exp(self.w_gc)/np.sum(np.exp(self.w_gc))
-		dw_gc[col_g] += 1
+		dw_gc[goalcol] += 1
 		return np.array([dw_pr,dw_pc,dw_gr,dw_gc])
 
 

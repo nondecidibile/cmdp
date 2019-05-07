@@ -8,10 +8,11 @@ from util.util_gridworld import *
 
 w_row = [5,3,2,1,0.5]
 w_col = [5,3,2,1,0.5]
-w_grow = [0.5,1,2,3,5]
+w_grow = [5,3,2,1,0.5]
 w_gcol = [0.5,1,2,3,5]
+model = np.array([w_row,w_col,w_grow,w_gcol])
 
-mdp = gridworld.GridworldEnv(w_row,w_col,w_grow,w_gcol)
+mdp = gridworld.GridworldEnv(model)
 mdp.horizon = 50
 
 
@@ -19,7 +20,7 @@ mdp.horizon = 50
 # Learning without some state features
 #
 
-sfMask = np.array([1,1,1,1, 1,1,1,1, 0,1,1,1, 1,1,1,1, 1],dtype=bool) # state features mask
+sfMask = np.array([1,1,1,1, 1,1,1,1, 1,1,1,0, 1,1,1,1, 1],dtype=bool) # state features mask
 agent_policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
 agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
 
@@ -34,7 +35,7 @@ learn(
 	plotGradient=False
 )
 
-N = 1000
+N = 100
 eps = collect_gridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
 super_policy = BoltzmannPolicy(17,4)

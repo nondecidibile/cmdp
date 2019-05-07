@@ -77,7 +77,7 @@ def collect_gridworld_episode(mdp,policy,horizon,transfMatrix=None,stateFeatures
 	rewards = np.zeros(shape=horizon,dtype=np.int32)
 
 	state = mdp.reset()
-	initialState = np.copy(state)
+	initialState = np.array(mdp.decode(state),dtype=np.int32)
 	if render:
 		mdp.render()
 
@@ -111,7 +111,7 @@ def collect_gridworld_episode(mdp,policy,horizon,transfMatrix=None,stateFeatures
 		
 		state = newstate
 	
-	episode_data = {"s": states,"a": actions,"r": rewards, "s0": initialState}
+	episode_data = {"s": states, "a": actions, "r": rewards, "s0": initialState}
 	return [episode_data,length]
 
 
@@ -122,7 +122,7 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,transfMatrix=None
 	data_s = np.zeros(shape=(num_episodes,horizon,nsf),dtype=np.float32)
 	data_a = np.zeros(shape=(num_episodes,horizon),dtype=np.int32)
 	data_r = np.zeros(shape=(num_episodes,horizon),dtype=np.int32)
-	data_s0 = np.zeros(shape=num_episodes,dtype=np.int32)
+	data_s0 = np.zeros(shape=(num_episodes,4),dtype=np.int32)
 	data_len = np.zeros(shape=num_episodes, dtype=np.int32)
 	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len, "s0": data_s0}
 
@@ -234,3 +234,56 @@ def find_params_ml(estLearner,eps,saveFile=None):
 
 	if saveFile is not None:
 		np.save(saveFile,est_params)
+
+
+'''
+def getModelGradient(superLearner, eps, sfGradientMask, model, model2):
+
+	sfGradientMaskTiled = np.tile(sfGradientMask,(4,1))
+	sfGradientMaskLin = np.ravel(sfGradientMaskTiled)
+
+	mdp = gridworld.GridworldEnv(model)
+	mdp2 = gridworld.GridworldEnv(model2)
+
+	# importance sampling
+	initialStates = eps["s0"]
+	initialProbs = mdp.initialProb(initialStates[:,0],initialStates[:,1],initialStates[:,2],initialStates[:,3])
+	initialProbs2 = mdp2.initialProb(initialStates[:,0],initialStates[:,1],initialStates[:,2],initialStates[:,3])
+	initialIS = initialProbs2 / initialProbs
+	estimated_gradient2 = superLearner.estimate_gradient(eps,initialIS)
+
+	# norm^2_2 of the gradient of J
+	#x = np.linalg.norm(estimated_gradient2[sfGradientMaskTiled])**2
+
+	grads_estimates = superLearner.estimate_gradient(eps,getEstimates=True)
+	dj = np.ravel(estimated_gradient2)
+
+	ddj = np.zeros(shape=(len(eps["len"]),model.size,len(sfGradientMaskLin)),dtype=np.float32)
+	for n in range(len(eps["len"])):
+		hx1 = mdp.dInitialProb_dw(initialStates[n,0],initialStates[n,1],initialStates[n,2],initialStates[n,3])
+		kx1 = grads_estimates[n]
+		ddj[n] = np.outer(hx1,kx1)
+	ddj = (ddj.T*initialIS).T
+	ddj = np.sum(ddj,axis=0)/len(eps["len"])
+
+	dj = dj[sfGradientMaskLin]
+	ddj = ddj[:,sfGradientMaskLin]
+	model_gradient_J = np.matmul(ddj,dj)
+
+	# ranyi divergence term
+	lambda_param = 1/1000000 * np.linalg.norm(estimated_gradient2,ord=np.inf)*np.sqrt(np.count_nonzero(sfGradientMaskLin)/0.95)
+	#print("lambda =",lambda_param)
+	#print("d2 = ",d2gaussians(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel)))
+	#print("weights = ",np.mean(initialIS**2))
+
+	model_gradient_div = lambda_param/2/np.sqrt(len(eps["len"]))
+	model_gradient_div *= d_d2gaussians_dmuP(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel))
+	model_gradient_div /= np.sqrt(d2gaussians(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel)))
+
+	model_gradient = model_gradient_J - model_gradient_div
+	#print("norm_2^2(grad J) =",x)
+	#print("model gradient [J] =",model_gradient_J)
+	#print("model gradient [div] =",model_gradient_div)
+	#print("model gradient =",model_gradient)
+	return model_gradient
+'''
