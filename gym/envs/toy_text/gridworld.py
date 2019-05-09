@@ -99,8 +99,14 @@ class GridworldEnv(discrete.DiscreteEnv):
 		dw_gr[goalrow] += 1
 		dw_gc = -np.exp(self.w_gc)/np.sum(np.exp(self.w_gc))
 		dw_gc[goalcol] += 1
-		return np.array([dw_pr,dw_pc,dw_gr,dw_gc])
+		return np.ravel(np.array([dw_pr,dw_pc,dw_gr,dw_gc]))
 
+	def getInitialProbs(self):
+		p_r = np.exp(self.w_pr)/np.sum(np.exp(self.w_pr))
+		p_c = np.exp(self.w_pc)/np.sum(np.exp(self.w_pc))
+		p_gr = np.exp(self.w_gr)/np.sum(np.exp(self.w_gr))
+		p_gc = np.exp(self.w_gc)/np.sum(np.exp(self.w_gc))
+		return [p_r,p_c,p_gr,p_gc]
 
 	def encode(self, agentrow, agentcol, goalrow, goalcol):
 		# (5) 5, 5, 5

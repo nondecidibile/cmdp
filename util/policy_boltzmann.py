@@ -66,7 +66,7 @@ class BoltzmannPolicy(Policy):
 
 	
 
-	def estimate_params(self, data, optimizer, params=None, setToZero=None, epsilon=0.01, minSteps=50, maxSteps=0):
+	def estimate_params(self, data, optimizer, params=None, setToZero=None, epsilon=0.01, minSteps=50, maxSteps=0, printInfo=True):
 
 		"""
 		Estimate the parameters of the policy with Maximum Likelihood given a set
@@ -100,7 +100,8 @@ class BoltzmannPolicy(Policy):
 			self.params = self.params + update_step
 			
 			update_size = np.linalg.norm(np.ravel(np.asarray(update_step)),2)
-			print(steps," - Update size :",update_size)
+			if printInfo:
+				print(steps," - Update size :",update_size)
 			steps += 1
 			if update_size<epsilon or steps>maxSteps:
 				flag = False

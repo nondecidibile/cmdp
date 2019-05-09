@@ -6,52 +6,72 @@ from util.optimizer import *
 from util.policy_boltzmann import *
 from util.util_gridworld import *
 
-w_row = [5,3,2,1,0.5]
-w_col = [5,3,2,1,0.5]
-w_grow = [5,3,2,1,0.5]
-w_gcol = [0.5,1,2,3,5]
-model = np.array([w_row,w_col,w_grow,w_gcol])
+w_row = [5,1,1,1,1]
+w_col = [5,1,1,1,1]
+w_grow = [5,1,1,1,1]
+w_gcol = [1,1,1,1,5]
+model = np.array([w_row,w_col,w_grow,w_gcol],dtype=np.float32)
 
 mdp = gridworld.GridworldEnv(model)
 mdp.horizon = 50
 
+sfMask = np.array([1,1,1,1, 1,1,1,1, 1,1,1,1, 0,0,0,0, 1],dtype=bool) # Agent features
+
+sfTestMask = np.ones(shape=16,dtype=np.bool) # Features not rejected
 
 #
-# Learning without some state features
+# Cycle ENVIRONMENT CONFIGURATION
 #
+for conf_index in range(1000):
 
-sfMask = np.array([1,1,1,1, 1,1,1,1, 1,1,1,0, 1,1,1,1, 1],dtype=bool) # state features mask
-agent_policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
-agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
+	print("Using MDP ",model)
+	mdp = gridworld.GridworldEnv(model)
+	mdp.horizon = 50
+	saveStateImage("stateImage"+str(conf_index)+"A.png",mdp,sfTestMask)
 
-learn(
-	learner=agent_learner,
-	steps=100,
-	nEpisodes=250,
-	sfmask=sfMask,
-	loadFile=None,
-	saveFile=None,
-	autosave=True,
-	plotGradient=False
-)
+	agent_policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
+	agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
 
-N = 100
-eps = collect_gridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
+	learn(
+		learner=agent_learner,
+		steps=200,
+		nEpisodes=250,
+		sfmask=sfMask,
+		loadFile=None,
+		saveFile=None,
+		autosave=True,
+		plotGradient=False,
+		printInfo=False
+	)
 
-super_policy = BoltzmannPolicy(17,4)
+	super_policy = BoltzmannPolicy(nStateFeatures=17,nActions=4)
+	super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
 
-optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
-params = super_policy.estimate_params(eps,optimizer,setToZero=None,epsilon=0.001,minSteps=100,maxSteps=1000)
-ll = super_policy.getLogLikelihood(eps,params)
+	N = 100
+	eps = collect_gridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
-ll_h0 = np.zeros(shape=(16),dtype=np.float32)
-for param in range(16):
-	optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
-	params_h0 = super_policy.estimate_params(eps,optimizer,setToZero=param,epsilon=0.001,minSteps=100,maxSteps=1000)
-	ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
+	# Test parameters
+	lr_lambda = lrTest(eps,sfTestMask)
+	saveStateImage("stateImage"+str(conf_index)+"B.png",mdp,sfTestMask)
+	print(sfTestMask)
+	print(lr_lambda)
 
-print(ll)
-print(ll_h0)
-for param in range(16):
-	lr_lambda = -2*(ll_h0[param] - ll)
-	print(param,"-",lr_lambda)
+	# Choose next parameter for model optimization
+	sfTestMaskIndices = np.where(sfTestMask == True)
+	sfGradientMask = np.zeros(shape=17,dtype=np.bool)
+	sfGradientMask[sfTestMaskIndices[0][0]] = True
+	print("Configuring model to test parameter",sfTestMaskIndices[0][0])
+
+	model2 = model.copy()
+	model2[0,0] += 0.01
+	model2[1,1] -= 0.01
+	model2[2,2] += 0.01
+	model2[3,3] -= 0.01
+
+	modelOptimizer = AdamOptimizer(shape=(4,5),learning_rate=0.01)
+	for _i in range(150):
+		modelGradient = getModelGradient(super_learner,eps,sfGradientMask,model,model2)
+		model2 += modelOptimizer.step(modelGradient)
+		#print("MODEL:",model2,"\n")
+
+	model = model2.copy()

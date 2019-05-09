@@ -10,17 +10,15 @@ import sys
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-meanModel = [0,0,2,2]
-varModel = [0.1,0.1,0.5,0.5]
+meanModel = [-2,2,2,-2]
+varModel = [0.25,0.25,0.5,0.5]
 
 sfMask = np.ones(shape=50,dtype=bool) # state features mask
 sfMask[40:50] = False
 
-super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
-super_learner = GpomdpLearner(None,super_policy,gamma=0.98)
-
 sfTestMask = np.ones(shape=50,dtype=np.bool) # State features not rejected
 #sfTestMask[0:25] = False
+
 '''
 sfBestModels = []
 for sf in range(50):
@@ -30,13 +28,14 @@ for sf in range(50):
 #
 # Cycle ENVIRONMENT CONFIGURATION
 #
-for configuration_index in range(1000):
+for conf_index in range(1000):
 
 	print("Using MDP with mean =",meanModel)
 	mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=meanModel,var=varModel)
 	mdp.horizon = 50
 	#mdp_uniform = gridworld_cont.GridworldContEnv()
 	#mdp_uniform.horizon = 50
+	saveStateImage("stateImage"+str(conf_index)+"A.png",meanModel,varModel,sfTestMask)
 
 	agent_policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
 	agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
@@ -59,9 +58,10 @@ for configuration_index in range(1000):
 	eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
 	# Test parameters
-	lr_lambda = lrTest(eps,sfTestMask,lr=0.03,epsilon=0.001,maxSteps=1000)
+	lr_lambda = lrTest(eps,sfTestMask)
 	print(sfTestMask)
 	print(lr_lambda)
+	saveStateImage("stateImage"+str(conf_index)+"B.png",meanModel,varModel,sfTestMask)
 
 	# Choose next parameter for model optimization
 	sfTestMaskIndices = np.where(sfTestMask == True)

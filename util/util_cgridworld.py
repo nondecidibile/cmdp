@@ -5,6 +5,7 @@ from util.policy_gaussian import *
 from progress.bar import Bar
 import matplotlib.pyplot as plt
 from tkinter import *
+from PIL import Image, ImageDraw
 import time
 
 def build_cgridworld_features(mdp,state,transfMatrix=None,stateFeaturesMask=None):
@@ -346,14 +347,13 @@ def updateSfBestModels(superLearner,eps,sfBestModels,meanModel,varModel,meanMode
 			sfBestModels[i][1] = grad2
 			sfBestModels[i][0] = meanModel2.copy()
 
-def lrTest(eps,sfMask,nsf=50,na=2,lr=0.03,epsilon=0.001,maxSteps=1000):
+def lrTest(eps,sfMask,nsf=50,na=2):
 
-	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask)+1)
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask))
 	super_policy = GaussianPolicy(nStateFeatures=nsf,actionDim=na)
 
 	params = super_policy.estimate_params(eps,setToZero=None)
 	ll = super_policy.getLogLikelihood(eps,params)
-	bar.next()
 
 	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
 	for param in range(nsf):
@@ -373,3 +373,35 @@ def lrTest(eps,sfMask,nsf=50,na=2,lr=0.03,epsilon=0.001,maxSteps=1000):
 			sfMask[param] = False
 	
 	return lr_lambda
+
+def saveStateImage(filename,mean,var,sfMask):
+	W = H = 300
+	S = W/5
+	offset = S/2
+
+	pf = 7
+	gf = 10
+
+	image = Image.new("RGB", (W, H), (255,255,255))
+	draw = ImageDraw.Draw(image)
+
+	center_pos = np.array([mean[0]+2.5,5-(mean[1]+2.5)],dtype=np.float32)/5*W
+	center_goal = np.array([mean[2]+2.5,5-(mean[3]+2.5)],dtype=np.float32)/5*W
+	dist_pos = np.array([var[0],var[1]],dtype=np.float32)*S*1.5
+	dist_goal = np.array([var[2],var[3]],dtype=np.float32)*S*2
+	draw.ellipse((center_pos[0]-dist_pos[0],center_pos[1]-dist_pos[1],center_pos[0]+dist_pos[0],center_pos[1]+dist_pos[1]),fill=(200,200,255))
+	draw.ellipse((center_goal[0]-dist_goal[0],center_goal[1]-dist_goal[1],center_goal[0]+dist_goal[0],center_goal[1]+dist_goal[1]),fill=(255,200,200))
+
+	#draw.line((W,0,W,H),fill=(0,0,0),width=2)
+	for i in range(5):
+		for j in range(5):
+			draw.rectangle((offset+j*S-1, offset+(4-i)*S-1, offset+j*S+1, offset+(4-i)*S+1), fill=(0,0,0), outline=(0,0,0))
+			draw.rectangle((W+offset+j*S-1, offset+(4-i)*S-1, W+offset+j*S+1, offset+(4-i)*S+1), fill=(0,0,0), outline=(0,0,0))
+			posindex = j+i*5
+			goalindex = 25+j+i*5
+			if sfMask[posindex]:
+				draw.ellipse((offset+j*S-pf, offset+(4-i)*S-pf, offset+j*S+pf, offset+(4-i)*S+pf),outline=(0,0,255))
+			if sfMask[goalindex]:
+				draw.ellipse((offset+j*S-gf, offset+(4-i)*S-gf, offset+j*S+gf, offset+(4-i)*S+gf),outline=(255,0,0))
+
+	image.save(filename)

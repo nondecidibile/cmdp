@@ -1,9 +1,11 @@
 import numpy as np
 import time
 from gym.envs.toy_text import taxi, gridworld
+from util.policy_boltzmann import *
 from util.optimizer import *
 from progress.bar import Bar
 import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw
 
 
 def onehot_encode(i, n):
@@ -77,7 +79,7 @@ def collect_gridworld_episode(mdp,policy,horizon,transfMatrix=None,stateFeatures
 	rewards = np.zeros(shape=horizon,dtype=np.int32)
 
 	state = mdp.reset()
-	initialState = np.array(mdp.decode(state),dtype=np.int32)
+	initialState = np.array(list(mdp.decode(state)))
 	if render:
 		mdp.render()
 
@@ -126,7 +128,6 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,transfMatrix=None
 	data_len = np.zeros(shape=num_episodes, dtype=np.int32)
 	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len, "s0": data_s0}
 
-	mean_length = 0
 	if showProgress:
 		bar = Bar('Collecting episodes', max=num_episodes)
 
@@ -147,7 +148,7 @@ def collect_gridworld_episodes(mdp,policy,num_episodes,horizon,transfMatrix=None
 
 
 def learn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None, adamOptimizer=True,
-		learningRate=0.1, loadFile=None, saveFile=None, autosave=False, plotGradient=False):
+		learningRate=0.1, loadFile=None, saveFile=None, autosave=False, plotGradient=False, printInfo=True):
 
 	if loadFile is not None:
 		learner.policy.params = np.load(loadFile)
@@ -170,6 +171,9 @@ def learn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None, adamOptimiz
 	avg_max_gradient = 0
 	mt = avg
 
+	if not printInfo:
+		bar = Bar('Agent learning', max=steps)
+
 	for step in range(steps):
 
 		eps = collect_gridworld_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,
@@ -183,16 +187,19 @@ def learn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None, adamOptimiz
 
 		learner.policy.params += update_step
 
-		print("Step: "+str(step))
 		mean_length = np.mean(eps["len"])
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
 		avg_mean_length_t = avg_mean_length/(1-mt)
-		print("Mean length: "+str(np.round(mean_length,3)))
 		max_gradient = np.max(np.abs(gradient))
 		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
 		avg_max_gradient_t = avg_max_gradient/(1-mt)
 		mt = mt*avg
-		print("Maximum gradient:    "+str(np.round(max_gradient,5))+"\n")
+		if printInfo:
+			print("Step:             "+str(step))
+			print("Mean length:      "+str(np.round(mean_length,3)))
+			print("Maximum gradient: "+str(np.round(max_gradient,5))+"\n")
+		else:
+			bar.next()
 
 		if plotGradient:
 			xs.append(step)
@@ -215,6 +222,9 @@ def learn(learner, steps, nEpisodes, transfMatrix=None, sfmask=None, adamOptimiz
 		np.save(saveFile,learner.policy.params)
 		print("Params saved in ",saveFile,"\n")
 	
+	if not printInfo:
+		bar.finish()
+	
 	'''
 	if plotGradient:
 		plt.show()
@@ -236,7 +246,34 @@ def find_params_ml(estLearner,eps,saveFile=None):
 		np.save(saveFile,est_params)
 
 
-'''
+def d2divTerm(mdpP, mdpQ):
+	posrows = np.zeros(625,dtype=np.int32)
+	poscols = np.zeros(625,dtype=np.int32)
+	goalrows = np.zeros(625,dtype=np.int32)
+	goalcols = np.zeros(625,dtype=np.int32)
+	dQxdw = np.zeros(shape=(625,20),dtype=np.float32)
+
+	i = 0
+	for a in range(5):
+		for b in range(5):
+			for c in range(5):
+				for d in range(5):
+					posrows[i] = a
+					poscols[i] = b
+					goalrows[i] = c
+					goalcols[i] = d
+					dQxdw[i] = mdpQ.dInitialProb_dw(a,b,c,d)
+					i+=1
+
+	probsP = mdpP.initialProb(posrows,poscols,goalrows,goalcols)
+	probsQ = mdpQ.initialProb(posrows,poscols,goalrows,goalcols)
+	d2div = np.sum((probsP**2)/probsQ)
+
+	d_d2div_dw = np.dot(-((probsP/probsQ)**2),dQxdw)
+
+	return d_d2div_dw/np.sqrt(d2div)
+
+
 def getModelGradient(superLearner, eps, sfGradientMask, model, model2):
 
 	sfGradientMaskTiled = np.tile(sfGradientMask,(4,1))
@@ -271,19 +308,77 @@ def getModelGradient(superLearner, eps, sfGradientMask, model, model2):
 	model_gradient_J = np.matmul(ddj,dj)
 
 	# ranyi divergence term
-	lambda_param = 1/1000000 * np.linalg.norm(estimated_gradient2,ord=np.inf)*np.sqrt(np.count_nonzero(sfGradientMaskLin)/0.95)
+	lambda_param = 1/8*np.linalg.norm(estimated_gradient2,ord=np.inf)*np.sqrt(np.count_nonzero(sfGradientMaskLin)/0.95)
 	#print("lambda =",lambda_param)
 	#print("d2 = ",d2gaussians(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel)))
 	#print("weights = ",np.mean(initialIS**2))
 
-	model_gradient_div = lambda_param/2/np.sqrt(len(eps["len"]))
-	model_gradient_div *= d_d2gaussians_dmuP(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel))
-	model_gradient_div /= np.sqrt(d2gaussians(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel)))
+	model_gradient_div = lambda_param/2/np.sqrt(len(eps["len"])) * d2divTerm(mdp,mdp2)
+	#model_gradient_div *= d_d2gaussians_dmuP(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel))
+	#model_gradient_div /= np.sqrt(d2gaussians(meanModel2,np.diag(varModel2),meanModel,np.diag(varModel)))
 
 	model_gradient = model_gradient_J - model_gradient_div
 	#print("norm_2^2(grad J) =",x)
 	#print("model gradient [J] =",model_gradient_J)
 	#print("model gradient [div] =",model_gradient_div)
 	#print("model gradient =",model_gradient)
-	return model_gradient
-'''
+	return np.reshape(model_gradient,newshape=(4,5))
+
+
+def lrTest(eps,sfMask,lr=0.03,epsilon=0.001,maxSteps=1000):
+
+	super_policy = BoltzmannPolicy(17,4)
+	optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
+
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask))
+	params = super_policy.estimate_params(eps,optimizer,setToZero=None,epsilon=0.001,minSteps=100,maxSteps=1000,printInfo=False)
+	ll = super_policy.getLogLikelihood(eps,params)
+	ll_h0 = np.zeros(shape=(16),dtype=np.float32)
+	for param in range(16):
+		if sfMask[param]:
+			optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
+			params_h0 = super_policy.estimate_params(eps,optimizer,setToZero=param,epsilon=0.001,minSteps=100,maxSteps=1000,printInfo=False)
+			ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
+			bar.next()
+	bar.finish()
+	
+	#print(ll)
+	#print(ll_h0)
+	lr_lambda = -2*(ll_h0 - ll)
+
+	for param in range(16):
+		if lr_lambda[param] > 13.277:
+			sfMask[param] = False
+	
+	return lr_lambda
+
+
+def saveStateImage(filename,mdp,sfMask):
+	W = H = 200
+	S = W/5
+
+	image = Image.new("RGB", (W, H), (255,255,255))
+	draw = ImageDraw.Draw(image)
+
+	probs = mdp.getInitialProbs()
+
+	for i in range(5):
+		for j in range(5):
+			fraction_pos = probs[0][i] * probs[1][j]
+			fraction_goal = probs[2][i] * probs[3][j]
+			color = fraction_pos*np.array([1,1,0]) + fraction_goal*np.array([0,1,1])
+			color = 1-color#**0.5
+			color = tuple(np.int32(255*color))
+			draw.rectangle([S*j,4*S-S*i,S*j+S,5*S-S*i],fill=color,outline=(0,0,0))
+	
+	for i in range(4):
+		if sfMask[4+i]:
+			draw.line((i*S+S/2, S/10, i*S+S/2, H-S/10),fill=(0,0,255),width=1)
+		if sfMask[i]:
+			draw.line((S/10, i*S+S/2, W-S/10, i*S+S/2),fill=(0,0,255),width=1)
+		if sfMask[12+i]:
+			draw.line((i*S+S/2+3, S/10, i*S+S/2+3, H-S/10),fill=(255,0,0),width=1)
+		if sfMask[8+i]:
+			draw.line((S/10, i*S+S/2+3, W-S/10, i*S+S/2+3),fill=(255,0,0),width=1)
+
+	image.save(filename)
