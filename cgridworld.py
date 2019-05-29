@@ -10,11 +10,11 @@ import sys
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-meanModel = [-2,2,2,-2]
-varModel = [0.25,0.25,0.5,0.5]
+meanModel = [-2,-2,2,-2]
+varModel = [0.2,0.2,0.4,0.4]
 
 sfMask = np.ones(shape=50,dtype=bool) # state features mask
-sfMask[40:50] = False
+#sfMask[40:50] = False
 
 sfTestMask = np.ones(shape=50,dtype=np.bool) # State features not rejected
 #sfTestMask[0:25] = False
@@ -54,7 +54,7 @@ for conf_index in range(1000):
 	super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
 	super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
 
-	N = 2500
+	N = 1000
 	eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
 	# Test parameters
