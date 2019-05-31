@@ -5,7 +5,7 @@ from progress.bar import Bar
 
 def build_state_features(state):
 	x = np.array(state)
-	x = np.append(x,1)
+	#x = np.append(x,1)
 	return x
 
 def collect_pendulum_episode(mdp,policy,horizon,render=False):
@@ -25,7 +25,7 @@ def collect_pendulum_episode(mdp,policy,horizon,render=False):
 
 		length += 1
 
-		action = policy.draw_action(state)
+		action = policy.draw_action([state])
 		newstate, reward, done, _ = mdp.step(action)
 
 		states[i] = state
@@ -73,11 +73,7 @@ def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,render=False,showP
 	return data
 
 
-def plearn(learner, steps, nEpisodes, adamOptimizer=True, learningRate=0.1,
-		   loadFile=None, saveFile=None, autosave=False, plotGradient=False, printInfo=False):
-
-	if loadFile is not None:
-		learner.policy.params = np.load(loadFile)
+def plearn(mdp, policy, steps, nEpisodes, learningRate=0.1, plotGradient=False, printInfo=False):
 	
 	if steps<=0 or steps is None:
 		plotGradient = False
@@ -95,12 +91,12 @@ def plearn(learner, steps, nEpisodes, adamOptimizer=True, learningRate=0.1,
 	avg_mean_gradient = 0
 	mt = avg
 
+	print("step, mean_reward, mean_gradient, mean_update")
+
 	for step in range(steps):
 
-		eps = collect_pendulum_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,render=False)
-
-		gradient = learner.estimate_gradient(eps)
-		learner.policy.params += gradient*learningRate
+		eps = collect_pendulum_episodes(mdp,policy,nEpisodes,mdp.horizon,render=False)
+		gradient = policy.optimize_gradient(eps,learningRate)
 
 		mean_length = np.mean(eps["len"])
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
@@ -117,11 +113,14 @@ def plearn(learner, steps, nEpisodes, adamOptimizer=True, learningRate=0.1,
 		mean_reward = np.mean(eps["r"])
 		mt = mt*avg
 		if printInfo:
-			print("Step: "+str(step))
+			'''print("Step: "+str(step))
 			print("Mean length: "+str(np.round(mean_length,3)))
 			print("Mean gradient: "+str(np.round(mean_gradient,5)))
 			print("Maximum gradient: "+str(np.round(max_gradient,5)))
 			print("Mean rewards: ",str(np.round(mean_reward,5)))
+			print("Mean update: ",str(np.round(mean_gradient*learningRate,5)))
+			'''
+			print(str(step),",  ",str(np.round(mean_reward,5)),",  ",str(np.round(mean_gradient,5)),",   ",str(np.round(mean_gradient*learningRate,5)))
 
 		if plotGradient:
 			xs.append(step)
@@ -136,15 +135,7 @@ def plearn(learner, steps, nEpisodes, adamOptimizer=True, learningRate=0.1,
 			#plt.yscale("log")
 			plt.pause(0.000001)
 		
-		print(learner.policy.params)
-
-		if saveFile is not None and autosave and step%10==0:
-			np.save(saveFile,learner.policy.params)
-			print("Params saved in ",saveFile,"\n")
+		#policy.print_params()
 		
-		if step%25==0:
-			collect_pendulum_episode(learner.mdp,learner.policy,400,render=True)
-
-	if saveFile is not None:
-		np.save(saveFile,learner.policy.params)
-		print("Params saved in ",saveFile,"\n")
+		if step%25==0 and step>0:
+			collect_pendulum_episode(mdp,policy,400,render=True)

@@ -8,7 +8,7 @@ class GaussianPolicy(Policy):
 	Gaussian policy (with fixed diagonal covariance matrix)
 	"""
 
-	def __init__(self, nStateFeatures, actionDim, paramFillValue=0.1):
+	def __init__(self, nStateFeatures, actionDim):
 
 		super().__init__()
 
@@ -18,9 +18,9 @@ class GaussianPolicy(Policy):
 		self.nParams = self.actionDim*self.nStateFeatures
 
 		self.paramsShape = (self.actionDim, self.nStateFeatures)
-		self.params = np.zeros(self.paramsShape) #np.random.random_sample(self.paramsShape)*paramFillValue - paramFillValue/2
+		self.params = np.zeros(self.paramsShape)
 
-		self.covarianceMatrix = 0.25 * np.eye(self.actionDim) #np.diag(np.full(self.actionDim,0.25,dtype=np.float32))
+		self.covarianceMatrix = 0.25 * np.eye(self.actionDim)
 		self.cov_diag = np.diag(self.covarianceMatrix)
 
 	def draw_action(self, stateFeatures):
