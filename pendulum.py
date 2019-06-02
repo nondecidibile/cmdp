@@ -11,7 +11,7 @@ np.set_printoptions(suppress=True)
 
 mdp = PendulumEnv()
 mdp.horizon = 100
-agent_policy = NeuralNetworkPolicy(nStateFeatures=3,actionDim=1,nHiddenNeurons=8,gamma=0.995)
+agent_policy = NeuralNetworkPolicy(nStateFeatures=3,actionDim=1,nHiddenNeurons=16,paramInitMaxVal=0.01,gamma=0.995)
 
 #eps = collect_pendulum_episodes(mdp,agent_policy,10,mdp.horizon)
 #agent_policy.optimize_gradient(eps,0.003)
@@ -19,9 +19,9 @@ agent_policy = NeuralNetworkPolicy(nStateFeatures=3,actionDim=1,nHiddenNeurons=8
 plearn(
 	mdp,
 	agent_policy,
-	steps=1000,
-	nEpisodes=10,
-	learningRate=0.0005,
+	steps=10000,
+	nEpisodes=100,
+	learningRate=0.03,
 	plotGradient=True,
 	printInfo=True
 )

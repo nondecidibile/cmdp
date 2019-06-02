@@ -9,8 +9,7 @@ class NeuralNetworkPolicy(Policy):
 	Gaussian Policy with mean defined by a neural network
 	"""
 
-	def __init__(self, nStateFeatures, actionDim, nHiddenNeurons=8, paramInitMaxVal=0.1, gamma=0.9975):
-
+	def __init__(self, nStateFeatures, actionDim, nHiddenNeurons=8, paramInitMaxVal=0.25, gamma=0.9975):
 		super().__init__()
 		self.nStateFeatures = nStateFeatures
 		self.actionDim = actionDim
@@ -63,7 +62,7 @@ class NeuralNetworkPolicy(Policy):
 		log_grad_w2 = np.reshape(log_grad_w2,newshape=(-1))
 		return np.concatenate([log_grad_w1,log_grad_w2])
 
-	def optimize_gradient(self, eps, learningRate):
+	def optimize_gradient(self, eps, optimizer):
 
 		nEpisodes = len(eps["len"])
 		maxEpLength = max(eps["len"])
@@ -91,11 +90,13 @@ class NeuralNetworkPolicy(Policy):
 		gradient_ep = np.sum(grads_linear, axis=1)
 
 		gradient = np.mean(gradient_ep, axis=0)
+		update_step = optimizer.step(gradient)
+		#update_step = gradient * learningRate
 
-		var_gradient = tf.split(gradient,tf.stack(self.var_params))
+		update_step = tf.split(update_step,tf.stack(self.var_params))
 		for i,var in enumerate(tf.trainable_variables()):
-			var_gradient[i] = tf.reshape(var_gradient[i],shape=var.shape)
-			self.s.run(var.assign_add(var_gradient[i]*learningRate))
+			update_step[i] = tf.reshape(update_step[i],shape=var.shape)
+			self.s.run(var.assign_add(update_step[i]))
 		
 		return gradient
 	

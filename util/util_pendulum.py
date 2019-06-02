@@ -84,6 +84,8 @@ def plearn(mdp, policy, steps, nEpisodes, learningRate=0.1, plotGradient=False, 
 		ys = []
 		plt.plot(xs,ys)
 		plt.plot(xs,mys)
+	
+	optimizer = AdamOptimizer(policy.nParams, learning_rate=learningRate, beta1=0.9, beta2=0.99)
 
 	avg = 0.95
 	avg_mean_length = 0
@@ -96,7 +98,7 @@ def plearn(mdp, policy, steps, nEpisodes, learningRate=0.1, plotGradient=False, 
 	for step in range(steps):
 
 		eps = collect_pendulum_episodes(mdp,policy,nEpisodes,mdp.horizon,render=False)
-		gradient = policy.optimize_gradient(eps,learningRate)
+		gradient = policy.optimize_gradient(eps,optimizer)
 
 		mean_length = np.mean(eps["len"])
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
