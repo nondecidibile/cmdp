@@ -3,19 +3,18 @@ from util.policy import Policy
 import tensorflow as tf
 
 
-class NeuralNetworkPolicy(Policy):
+class nnGaussianPolicy(Policy):
 
 	"""
 	Gaussian Policy with mean defined by a neural network
 	"""
 
-	def __init__(self, nStateFeatures, actionDim, nHiddenNeurons=8, paramInitMaxVal=0.25, gamma=0.9975):
+	def __init__(self, nStateFeatures, actionDim, nHiddenNeurons=8, paramInitMaxVal=0.01, variance=0.25):
 		super().__init__()
 		self.nStateFeatures = nStateFeatures
 		self.actionDim = actionDim
 		self.nHiddenNeurons = nHiddenNeurons
-		self.gamma = gamma
-		self.covariance = 0.25
+		self.covariance = variance
 		self.covarianceMatrix = self.covariance * np.eye(self.actionDim)
 
 		tf.logging.set_verbosity(tf.logging.ERROR)
@@ -61,44 +60,6 @@ class NeuralNetworkPolicy(Policy):
 		log_grad_w1 = np.reshape(log_grad_w1,newshape=(-1))
 		log_grad_w2 = np.reshape(log_grad_w2,newshape=(-1))
 		return np.concatenate([log_grad_w1,log_grad_w2])
-
-	def optimize_gradient(self, eps, optimizer):
-
-		nEpisodes = len(eps["len"])
-		maxEpLength = max(eps["len"])
-
-		# log gradients
-		sl = np.zeros(shape=(nEpisodes, maxEpLength, self.nParams), dtype=np.float32)
-		dr = np.zeros(shape=(nEpisodes, maxEpLength), dtype=np.float32)
-
-		for n, T in enumerate(eps["len"]):
-
-			g = np.zeros(shape=(T, self.nParams))
-			for t in range(T):
-				g[t] = self.compute_log_gradient(eps["s"][n,t],eps["a"][n,t])
-
-			sl[n, :T] = np.cumsum(g, axis=0)
-			dr[n, :T] = self.gamma ** np.arange(T) * eps["r"][n, :T]
-		
-		# baseline
-		num = np.sum(sl * sl * dr[:, :, None], axis=0)
-		den = np.sum(sl * sl, axis=0) + 1e-9
-		b = num / den
-
-		# gradients
-		grads_linear = sl * (dr[:, :, None] - b[None])
-		gradient_ep = np.sum(grads_linear, axis=1)
-
-		gradient = np.mean(gradient_ep, axis=0)
-		update_step = optimizer.step(gradient)
-		#update_step = gradient * learningRate
-
-		update_step = tf.split(update_step,tf.stack(self.var_params))
-		for i,var in enumerate(tf.trainable_variables()):
-			update_step[i] = tf.reshape(update_step[i],shape=var.shape)
-			self.s.run(var.assign_add(update_step[i]))
-		
-		return gradient
 	
 	def print_params(self):
 		print(self.s.run([self.w1,self.w2]))

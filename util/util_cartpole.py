@@ -8,10 +8,10 @@ def build_state_features(state):
 	#x = np.append(x,1)
 	return x
 
-def collect_pendulum_episode(mdp,policy,horizon,render=False):
+def collect_cartpole_episode(mdp,policy,horizon,render=False):
 
 	states = np.zeros(shape=(horizon,policy.nStateFeatures),dtype=np.float32)
-	actions = np.zeros(shape=(horizon,1),dtype=np.float32)
+	actions = np.zeros(shape=(horizon,policy.nActions),dtype=np.float32)
 	rewards = np.zeros(shape=horizon,dtype=np.float32)
 
 	state = mdp.reset()
@@ -29,7 +29,9 @@ def collect_pendulum_episode(mdp,policy,horizon,render=False):
 		newstate, reward, done, _ = mdp.step(action)
 
 		states[i] = state
-		actions[i] = action
+		action_vector = np.zeros(policy.nActions,dtype=np.float32)
+		action_vector[action] = 1
+		actions[i] = action_vector
 		rewards[i] = reward
 
 		if render:
@@ -38,6 +40,8 @@ def collect_pendulum_episode(mdp,policy,horizon,render=False):
 		state = build_state_features(newstate)
 
 		if done:
+			if length<200:
+				rewards[i] = -5
 			break
 	
 	if render:
@@ -47,10 +51,10 @@ def collect_pendulum_episode(mdp,policy,horizon,render=False):
 	return [episode_data,length]
 
 
-def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,render=False,showProgress=False):
+def collect_cartpole_episodes(mdp,policy,num_episodes,horizon,render=False,showProgress=False):
 
 	data_s = np.zeros(shape=(num_episodes,horizon,policy.nStateFeatures),dtype=np.float32)
-	data_a = np.zeros(shape=(num_episodes,horizon,1),dtype=np.float32)
+	data_a = np.zeros(shape=(num_episodes,horizon,policy.nActions),dtype=np.float32)
 	data_r = np.zeros(shape=(num_episodes,horizon),dtype=np.float32)
 	data_len = np.zeros(shape=num_episodes, dtype=np.int32)
 	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len}
@@ -59,7 +63,7 @@ def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,render=False,showP
 		bar = Bar('Collecting episodes', max=num_episodes)
 	
 	for i in range(num_episodes):
-		episode_data, length = collect_pendulum_episode(mdp,policy,horizon,render)
+		episode_data, length = collect_cartpole_episode(mdp,policy,horizon,render)
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
 		data["r"][i] = episode_data["r"]
@@ -73,7 +77,7 @@ def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,render=False,showP
 	return data
 
 
-def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, printInfo=False):
+def ctlearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, printInfo=False):
 	
 	if steps<=0 or steps is None:
 		plotGradient = False
@@ -97,11 +101,11 @@ def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, prin
 	avg_mean_gradient = 0
 	mt = avg
 
-	print("step, mean_reward, max_gradient, mean_update")
+	print("step, mean_length, mean_reward, max_gradient, mean_update")
 
 	for step in range(steps):
 
-		eps = collect_pendulum_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,render=False)
+		eps = collect_cartpole_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,render=False)
 		gradient = learner.optimize_gradient(eps,optimizer)
 
 		mean_length = np.mean(eps["len"])
@@ -126,7 +130,7 @@ def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, prin
 			print("Mean rewards: ",str(np.round(mean_reward,5)))
 			print("Mean update: ",str(np.round(mean_gradient*learningRate,5)))
 			'''
-			print(str(step),",  ",str(np.round(mean_reward,5)),",  ",str(np.round(max_gradient,5)),",   ",str(np.round(mean_gradient*learningRate,5)))
+			print(str(step),",  ",str(np.round(mean_length,5))," ,",str(np.round(mean_reward,5)),",  ",str(np.round(max_gradient,5)),",   ",str(np.round(mean_gradient*learningRate,5)))
 
 		if plotGradient:
 			xs.append(step)
@@ -147,5 +151,5 @@ def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, prin
 		
 		#policy.print_params()
 		
-		if step%25==0 and step>0:
-			collect_pendulum_episode(learner.mdp,learner.policy,400,render=True)
+		if step%5==0 and step>0:
+			collect_cartpole_episode(learner.mdp,learner.policy,learner.mdp.horizon,render=True)
