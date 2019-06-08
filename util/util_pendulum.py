@@ -2,20 +2,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 from util.optimizer import *
 from progress.bar import Bar
+from util.policy_nn_gaussian import nnGaussianPolicy
+from scipy.stats import chi2
 
-def build_state_features(state):
+def build_state_features(state,sfmask=None):
 	x = np.array(state)
-	#x = np.append(x,1)
+	if sfmask is not None:
+		mask = np.array(sfmask, dtype=bool)
+		x[1-mask] = 0
 	return x
 
-def collect_pendulum_episode(mdp,policy,horizon,render=False):
+def collect_pendulum_episode(mdp,policy,horizon,sfmask=None,render=False):
 
 	states = np.zeros(shape=(horizon,policy.nStateFeatures),dtype=np.float32)
 	actions = np.zeros(shape=(horizon,1),dtype=np.float32)
 	rewards = np.zeros(shape=horizon,dtype=np.float32)
 
 	state = mdp.reset()
-	state = build_state_features(state)
+	state = build_state_features(state,sfmask)
 	if render:
 		mdp.render()
 
@@ -35,7 +39,7 @@ def collect_pendulum_episode(mdp,policy,horizon,render=False):
 		if render:
 			mdp.render()
 		
-		state = build_state_features(newstate)
+		state = build_state_features(newstate,sfmask)
 
 		if done:
 			break
@@ -47,7 +51,7 @@ def collect_pendulum_episode(mdp,policy,horizon,render=False):
 	return [episode_data,length]
 
 
-def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,render=False,showProgress=False):
+def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,sfmask=None,render=False,showProgress=False):
 
 	data_s = np.zeros(shape=(num_episodes,horizon,policy.nStateFeatures),dtype=np.float32)
 	data_a = np.zeros(shape=(num_episodes,horizon,1),dtype=np.float32)
@@ -59,7 +63,7 @@ def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,render=False,showP
 		bar = Bar('Collecting episodes', max=num_episodes)
 	
 	for i in range(num_episodes):
-		episode_data, length = collect_pendulum_episode(mdp,policy,horizon,render)
+		episode_data, length = collect_pendulum_episode(mdp,policy,horizon,sfmask,render)
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
 		data["r"][i] = episode_data["r"]
@@ -73,7 +77,7 @@ def collect_pendulum_episodes(mdp,policy,num_episodes,horizon,render=False,showP
 	return data
 
 
-def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, printInfo=False):
+def plearn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient=False, printInfo=False):
 	
 	if steps<=0 or steps is None:
 		plotGradient = False
@@ -89,6 +93,7 @@ def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, prin
 		plt.plot(xs,ys2)
 		plt.ylabel('Mean gradient')
 	
+	learner.policy.s.run(learner.policy.init_op)
 	optimizer = AdamOptimizer(learner.policy.nParams, learning_rate=learningRate, beta1=0.9, beta2=0.99)
 
 	avg = 0.95
@@ -101,7 +106,7 @@ def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, prin
 
 	for step in range(steps):
 
-		eps = collect_pendulum_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,render=False)
+		eps = collect_pendulum_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,sfmask,render=False)
 		gradient = learner.optimize_gradient(eps,optimizer)
 
 		mean_length = np.mean(eps["len"])
@@ -147,5 +152,32 @@ def plearn(learner, steps, nEpisodes, learningRate=0.1, plotGradient=False, prin
 		
 		#policy.print_params()
 		
-		if step%25==0 and step>0:
-			collect_pendulum_episode(learner.mdp,learner.policy,400,render=True)
+		if step%5==0 and step>0:
+			collect_pendulum_episode(learner.mdp,learner.policy,learner.mdp.horizon,sfmask,render=True)
+	
+def lrTest(eps,policyInstance,sfMask,nsf=3,na=1,lr=0.001,batchSize=25,epsilon=0.001,maxSteps=1000):
+
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask))
+
+	policyInstance.estimate_params(eps,lr,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+	ll = policyInstance.getLogLikelihood(eps)
+
+	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
+	for feature in range(nsf):
+		if sfMask[feature]:
+			policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+			ll_h0[feature] = policyInstance.getLogLikelihood(eps)
+			bar.next()
+
+	bar.finish()
+
+	#print(ll)
+	#print(ll_h0)
+	lr_lambda = -2*(ll_h0 - ll)
+
+	x = chi2.ppf(0.99,policyInstance.nHiddenNeurons)
+	for param in range(nsf):
+		if lr_lambda[param] > x:
+			sfMask[param] = False
+
+	return lr_lambda

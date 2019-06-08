@@ -12,7 +12,7 @@ class PendulumConfEnv(gym.Env):
 
     def __init__(self):
         self.max_speed=8
-        self.max_torque=2.
+        self.max_torque=5.
         self.dt=.05
         self.viewer = None
 

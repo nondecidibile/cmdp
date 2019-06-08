@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from tkinter import *
 from PIL import Image, ImageDraw
 import time
+from scipy.stats import chi2
 
 def build_cgridworld_features(mdp,state,transfMatrix=None,stateFeaturesMask=None):
 
@@ -368,8 +369,9 @@ def lrTest(eps,sfMask,nsf=50,na=2):
 	#print(ll_h0)
 	lr_lambda = -2*(ll_h0 - ll)
 
+	x = chi2.ppf(0.99,2)
 	for param in range(nsf):
-		if lr_lambda[param] > 9.2103:
+		if lr_lambda[param] > x:
 			sfMask[param] = False
 	
 	return lr_lambda

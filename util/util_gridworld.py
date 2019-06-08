@@ -6,6 +6,7 @@ from util.optimizer import *
 from progress.bar import Bar
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
+from scipy.stats import chi2
 
 
 def onehot_encode(i, n):
@@ -346,8 +347,9 @@ def lrTest(eps,sfMask,lr=0.03,epsilon=0.001,maxSteps=1000):
 	#print(ll_h0)
 	lr_lambda = -2*(ll_h0 - ll)
 
+	x = chi2.ppf(0.99,4)
 	for param in range(16):
-		if lr_lambda[param] > 13.277:
+		if lr_lambda[param] > x:
 			sfMask[param] = False
 	
 	return lr_lambda
