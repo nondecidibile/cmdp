@@ -81,7 +81,7 @@ class nnGaussianPolicy(Policy):
 		log_grad_list = [np.reshape(v,newshape=(-1)) for k,v in log_grad.items()] 
 		return np.concatenate(log_grad_list)
 
-	def estimate_params(self, data, lr, nullFeature=None, batchSize=25, epsilon=0.01, minSteps=50, maxSteps=0, printInfo=True):
+	def estimate_params(self, data, lr, params0=None, nullFeature=None, batchSize=25, epsilon=0.01, minSteps=50, maxSteps=0, printInfo=True):
 
 		"""
 		Estimate the parameters of the policy with Maximum Likelihood given a set
@@ -101,6 +101,9 @@ class nnGaussianPolicy(Policy):
 		
 		init_op = tf.global_variables_initializer()
 		self.s.run(init_op)
+
+		if params0 is not None:
+			self.set_params(params0)
 
 		flag = True
 		steps = 0
