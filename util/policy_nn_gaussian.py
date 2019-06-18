@@ -120,11 +120,11 @@ class nnGaussianPolicy(Policy):
 				self.action_ph: np.reshape(data_a,newshape=(-1,self.actionDim))
 			})
 
-			params = self.get_params()
 			if nullFeature is not None:
 				w = self.params["w1"].eval(self.s)
 				w[nullFeature,:] = 0
 				self.s.run(self.params["w1"].assign(w))
+			params = self.get_params()
 			update_size = np.linalg.norm(np.ravel(np.asarray(params-old_params)),np.inf)
 			old_params = params
 

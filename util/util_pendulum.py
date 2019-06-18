@@ -159,21 +159,24 @@ def lrTest(eps,policyInstance,sfMask,nsf=3,na=1,lr=0.001,batchSize=25,epsilon=0.
 
 	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask))
 
-	policyInstance.estimate_params(eps,lr,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
-	ll = policyInstance.getLogLikelihood(eps)
+	#policyInstance.estimate_params(eps,lr,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+	#ll = policyInstance.getLogLikelihood(eps)
 
 	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
+	ll_tot = np.zeros(shape=(nsf),dtype=np.float32)
 	for feature in range(nsf):
 		if sfMask[feature]:
-			policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+			params0 = policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
 			ll_h0[feature] = policyInstance.getLogLikelihood(eps)
+			policyInstance.estimate_params(eps,lr,params0=params0,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+			ll_tot[feature] = policyInstance.getLogLikelihood(eps)
 			bar.next()
 
 	bar.finish()
 
-	#print(ll)
-	#print(ll_h0)
-	lr_lambda = -2*(ll_h0 - ll)
+	print("Log likelihood without i-th feature:",ll_h0)
+	print("Log likelihood with every feature:  ",ll_tot)
+	lr_lambda = -2*(ll_h0 - ll_tot)
 
 	x = chi2.ppf(0.99,policyInstance.nHiddenNeurons)
 	for param in range(nsf):

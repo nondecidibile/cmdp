@@ -53,7 +53,7 @@ class PendulumConfEnv(gym.Env):
 
     def _get_obs(self):
         theta, thetadot = self.state
-        return np.array([np.cos(theta), np.sin(theta), thetadot])
+        return np.array([np.cos(theta), np.sin(theta), np.sign(np.cos(theta)), np.sign(np.sin(theta)), thetadot])
 
     def render(self, mode='human'):
 
