@@ -408,6 +408,31 @@ def saveStateImage(filename,mean,var,sfMask):
 
 	image.save(filename)
 
+def saveTrajectoryImage(filename,history_pos,history_goal):
+	W = H = 300
+	S = W/5
+	offset = S/2
+
+	pf = 7
+	gf = 10
+
+	image = Image.new("RGB", (W, H), (255,255,255))
+	draw = ImageDraw.Draw(image)
+
+	for i in range(5):
+		for j in range(5):
+			draw.rectangle((offset+j*S-1, offset+(4-i)*S-1, offset+j*S+1, offset+(4-i)*S+1), fill=(0,0,0), outline=(0,0,0))
+			draw.rectangle((W+offset+j*S-1, offset+(4-i)*S-1, W+offset+j*S+1, offset+(4-i)*S+1), fill=(0,0,0), outline=(0,0,0))
+
+	for i in range(len(history_pos)-1):
+		center_pos_a = np.array([history_pos[i][0]+2.5,5-(history_pos[i][1]+2.5)],dtype=np.float32)/5*W
+		center_pos_b = np.array([history_pos[i+1][0]+2.5,5-(history_pos[i+1][1]+2.5)],dtype=np.float32)/5*W
+		center_goal_a = np.array([history_goal[i][0]+2.5,5-(history_goal[i][1]+2.5)],dtype=np.float32)/5*W
+		center_goal_b = np.array([history_goal[i+1][0]+2.5,5-(history_goal[i+1][1]+2.5)],dtype=np.float32)/5*W
+		draw.line((center_pos_a[0],center_pos_a[1],center_pos_b[0],center_pos_b[1]),fill=(0,0,255),width=2)
+		draw.line((center_goal_a[0],center_goal_a[1],center_goal_b[0],center_goal_b[1]),fill=(255,0,0),width=2)
+
+	image.save(filename)
 
 def clearn_nn(mdp, policy, steps, nEpisodes, learningRate=0.1, plotGradient=False, printInfo=False):
 

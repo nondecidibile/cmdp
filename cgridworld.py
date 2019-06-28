@@ -13,17 +13,17 @@ np.set_printoptions(suppress=True)
 meanModel = [-2,-2,2,-2]
 varModel = [0.2,0.2,0.4,0.4]
 
-sfMask = np.ones(shape=50,dtype=bool) # state features mask
+#sfMask = np.ones(shape=50,dtype=bool) # state features mask
 #sfMask[40:50] = False
+sfMask = np.random.choice(a=[False, True], size=(50), p=[0.8, 0.2])
+sfMask = np.array(sfMask,dtype=np.bool)
 
 sfTestMask = np.ones(shape=50,dtype=np.bool) # State features not rejected
-#sfTestMask[0:25] = False
+sfTestTrials = np.zeros(shape=50,dtype=np.int32) # Num of trials for each state feature
+MAX_NUM_TRIALS = 3
 
-'''
-sfBestModels = []
-for sf in range(50):
-	sfBestModels.append([meanModel.copy(),0])
-'''
+history_pos = []
+history_goal = []
 
 #
 # Cycle ENVIRONMENT CONFIGURATION
@@ -31,6 +31,9 @@ for sf in range(50):
 for conf_index in range(1000):
 
 	print("Using MDP with mean =",meanModel)
+	history_pos.append(np.array([meanModel[0],meanModel[1]]))
+	history_goal.append(np.array([meanModel[2],meanModel[3]]))
+
 	mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=meanModel,var=varModel)
 	mdp.horizon = 50
 	#mdp_uniform = gridworld_cont.GridworldContEnv()
@@ -65,9 +68,21 @@ for conf_index in range(1000):
 
 	# Choose next parameter for model optimization
 	sfTestMaskIndices = np.where(sfTestMask == True)
+	nextIndex = -1
+	if sfTestMaskIndices[0].size == 0:
+		print("Rejected every feature. End of the experiment.")
+		break
+	for i in sfTestMaskIndices[0]:
+		if sfTestTrials[i] < MAX_NUM_TRIALS:
+			nextIndex = i
+			sfTestTrials[i] += 1
+			break
+	if nextIndex == -1:
+		print("Tested every not rejected feature",MAX_NUM_TRIALS,"times. End of the experiment.")
+		break
 	sfGradientMask = np.zeros(shape=50,dtype=np.bool)
-	sfGradientMask[sfTestMaskIndices[0][0]] = True
-	print("Configuring model to test parameter",sfTestMaskIndices[0][0])
+	sfGradientMask[nextIndex] = True
+	print("Configuring model to test parameter",nextIndex)
 
 	meanModel2 = meanModel.copy() #sfBestModels[sfTestMaskIndices[0][0]][0]
 	meanModel2[0] -= 0.05
@@ -80,11 +95,8 @@ for conf_index in range(1000):
 	for _i in range(150):
 		modelGradient = getModelGradient(super_learner,eps,sfGradientMask,meanModel,varModel,meanModel2,varModel2)
 		meanModel2 += modelOptimizer.step(modelGradient)
-		#print("MODEL:",meanModel2,"\n")
-	'''
-	#updateSfBestModels(super_learner,eps,sfBestModels,meanModel,varModel,meanModel2,varModel2)
-	#sfBestModels[sfTestMaskIndices[0][0]][0] = meanModel2.copy()
-	'''
 
 	meanModel = meanModel2.copy()
 	varModel = varModel2.copy()
+
+	saveTrajectoryImage("trajectoryImage.png",history_pos,history_goal)
