@@ -10,43 +10,52 @@ import sys
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-meanModel = [-2,-2,2,-2]
-varModel = [0.2,0.2,0.4,0.4]
+NUM_EXPERIMENTS = 25
+type1err_tot = 0
+type2err_tot = 0
 
-#sfMask = np.ones(shape=50,dtype=bool) # state features mask
-#sfMask[40:50] = False
-sfMask = np.random.choice(a=[False, True], size=(50), p=[0.8, 0.2])
-sfMask = np.array(sfMask,dtype=np.bool)
+MDP_HORIZON = 50
+LEARNING_STEPS = 100
+LEARNING_EPISODES = 100
 
-sfTestMask = np.ones(shape=50,dtype=np.bool) # State features not rejected
-sfTestTrials = np.zeros(shape=50,dtype=np.int32) # Num of trials for each state feature
+CONFIGURATION_STEPS = 100
+
 MAX_NUM_TRIALS = 3
+N = 1000 # number of episodes collected for the LR test and the configuration
 
-history_pos = []
-history_goal = []
+for experiment_i in range(NUM_EXPERIMENTS):
 
-#
-# Cycle ENVIRONMENT CONFIGURATION
-#
-for conf_index in range(1000):
+	print("\nExperiment",experiment_i,flush=True)
+	initialMeanModel = -2+np.random.rand(4)*4
+	varModel = [0.2,0.2,0.4,0.4]
 
-	print("Using MDP with mean =",meanModel)
-	history_pos.append(np.array([meanModel[0],meanModel[1]]))
-	history_goal.append(np.array([meanModel[2],meanModel[3]]))
+	#sfMask = np.ones(shape=50,dtype=bool) # state features mask
+	#sfMask[40:50] = False
+	sfMask = np.random.choice(a=[False, True], size=(50), p=[0.5, 0.5])
+	sfMask = np.array(sfMask,dtype=np.bool)
 
-	mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=meanModel,var=varModel)
-	mdp.horizon = 50
+	sfTestMask = np.zeros(shape=50,dtype=np.bool) # State features rejected (we think the agent have)
+	sfTestTrials = np.zeros(shape=50,dtype=np.int32) # Num of trials for each state feature
+
+	#
+	# Initial model - First test
+	#
+
+	print("Using initial MDP with mean =",initialMeanModel,flush=True)
+
+	mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=initialMeanModel,var=varModel)
+	mdp.horizon = MDP_HORIZON
 	#mdp_uniform = gridworld_cont.GridworldContEnv()
 	#mdp_uniform.horizon = 50
-	saveStateImage("stateImage"+str(conf_index)+"A.png",meanModel,varModel,sfTestMask)
+	saveStateImage("stateImage_"+str(experiment_i)+"_0A.png",initialMeanModel,varModel,sfTestMask)
 
-	agent_policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
-	agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
+	agent_policy_initial_model = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
+	agent_learner_initial_model = GpomdpLearner(mdp,agent_policy_initial_model,gamma=0.98)
 
 	clearn(
-		agent_learner,
-		steps=100,
-		nEpisodes=250,
+		agent_learner_initial_model,
+		steps=LEARNING_STEPS,
+		nEpisodes=LEARNING_EPISODES,
 		sfmask=sfMask,
 		loadFile=None,
 		saveFile=None,
@@ -54,49 +63,111 @@ for conf_index in range(1000):
 		printInfo=False
 	)
 
-	super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
-	super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
+	super_policy_initial_model = GaussianPolicy(nStateFeatures=50,actionDim=2)
+	super_learner_initial_model = GpomdpLearner(mdp,super_policy_initial_model,gamma=0.98)
 
-	N = 1000
-	eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
+	eps_initial_model = collect_cgridworld_episodes(mdp,agent_policy_initial_model,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
 	# Test parameters
-	lr_lambda = lrTest(eps,sfTestMask)
-	print(sfTestMask)
-	print(lr_lambda)
-	saveStateImage("stateImage"+str(conf_index)+"B.png",meanModel,varModel,sfTestMask)
+	lr_lambda = lrTest(eps_initial_model,sfTestMask)
+	print("REAL AGENT MASK\n",sfMask,flush=True)
+	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
+	print("LR_LAMBDA\n",lr_lambda,flush=True)
+	saveStateImage("stateImage_"+str(experiment_i)+"_0B.png",initialMeanModel,varModel,sfTestMask)
 
-	# Choose next parameter for model optimization
-	sfTestMaskIndices = np.where(sfTestMask == True)
-	nextIndex = -1
-	if sfTestMaskIndices[0].size == 0:
-		print("Rejected every feature. End of the experiment.")
-		break
-	for i in sfTestMaskIndices[0]:
-		if sfTestTrials[i] < MAX_NUM_TRIALS:
-			nextIndex = i
-			sfTestTrials[i] += 1
+	#
+	# Cycle ENVIRONMENT CONFIGURATION
+	#
+	meanModel = None
+	eps = None
+	super_learner = None
+	for conf_index in range(1,10000):
+
+		# Choose next parameter for model optimization
+		sfTestMaskIndices = np.where(sfTestMask == False)
+		nextIndex = -1
+		if sfTestMaskIndices[0].size == 0:
+			print("Rejected every feature. End of the experiment.",flush=True)
 			break
-	if nextIndex == -1:
-		print("Tested every not rejected feature",MAX_NUM_TRIALS,"times. End of the experiment.")
-		break
-	sfGradientMask = np.zeros(shape=50,dtype=np.bool)
-	sfGradientMask[nextIndex] = True
-	print("Configuring model to test parameter",nextIndex)
+		for i in sfTestMaskIndices[0]:
+			if sfTestTrials[i] < MAX_NUM_TRIALS:
+				nextIndex = i
+				if(sfTestTrials[i]==0):
+					meanModel = initialMeanModel.copy()
+					eps = eps_initial_model
+					super_learner = super_learner_initial_model
+				sfTestTrials[i] += 1
+				break
+		if nextIndex == -1:
+			print("Tested every not rejected feature",MAX_NUM_TRIALS,"times. End of the experiment.",flush=True)
+			break
+		sfGradientMask = np.zeros(shape=50,dtype=np.bool)
+		sfGradientMask[nextIndex] = True
+		print("Iteration",conf_index,"\nConfiguring model to test parameter",nextIndex,flush=True)
 
-	meanModel2 = meanModel.copy() #sfBestModels[sfTestMaskIndices[0][0]][0]
-	meanModel2[0] -= 0.05
-	meanModel2[1] += 0.05
-	meanModel2[2] -= 0.05
-	meanModel2[3] += 0.05
-	varModel2 = varModel.copy()
+		meanModel2 = meanModel.copy()
+		meanModel2[0] += -0.05 + 0.1*np.random.rand()
+		meanModel2[1] += -0.05 + 0.1*np.random.rand()
+		meanModel2[2] += -0.05 + 0.1*np.random.rand()
+		meanModel2[3] += -0.05 + 0.1*np.random.rand()
 
-	modelOptimizer = AdamOptimizer(shape=4,learning_rate=0.01)
-	for _i in range(150):
-		modelGradient = getModelGradient(super_learner,eps,sfGradientMask,meanModel,varModel,meanModel2,varModel2)
-		meanModel2 += modelOptimizer.step(modelGradient)
+		modelOptimizer = AdamOptimizer(shape=4,learning_rate=0.01)
+		for _i in range(CONFIGURATION_STEPS):
+			modelGradient = getModelGradient(super_learner,eps,sfGradientMask,meanModel,varModel,meanModel2,varModel)
+			meanModel2 += modelOptimizer.step(modelGradient)
 
-	meanModel = meanModel2.copy()
-	varModel = varModel2.copy()
+		meanModel = meanModel2.copy()
 
-	saveTrajectoryImage("trajectoryImage.png",history_pos,history_goal)
+		print("Using MDP with mean =",meanModel,flush=True)
+
+		mdp = gridworld_cont_normal.GridworldContNormalEnv(mean=meanModel,var=varModel)
+		mdp.horizon = MDP_HORIZON
+		#mdp_uniform = gridworld_cont.GridworldContEnv()
+		#mdp_uniform.horizon = 50
+		saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"A.png",meanModel,varModel,sfTestMask)
+
+		agent_policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
+		agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
+
+		clearn(
+			agent_learner,
+			steps=LEARNING_STEPS,
+			nEpisodes=LEARNING_EPISODES,
+			sfmask=sfMask,
+			loadFile=None,
+			saveFile=None,
+			autosave=True,
+			printInfo=False
+		)
+
+		super_policy = GaussianPolicy(nStateFeatures=50,actionDim=2)
+		super_learner = GpomdpLearner(mdp,super_policy,gamma=0.98)
+
+		eps = collect_cgridworld_episodes(mdp,agent_policy,N,mdp.horizon,stateFeaturesMask=sfMask,showProgress=True,exportAllStateFeatures=True)
+
+		# Test parameters
+		sfTestMask_single = np.ones(shape=sfTestMask.size,dtype=np.bool)
+		sfTestMask_single[nextIndex] = False
+		lr_lambda = lrTest(eps,sfTestMask_single)
+		sfTestMask[nextIndex] = sfTestMask_single[nextIndex]
+		print("Agent feature",nextIndex,"present:",sfMask[nextIndex],flush=True)
+		print("Estimated:",sfTestMask[nextIndex],flush=True)
+		print("Lr lambda =",lr_lambda[nextIndex],flush=True)
+		saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"B.png",meanModel,varModel,sfTestMask)
+	
+	x = np.array(sfTestMask,dtype=np.int32)-np.array(sfMask,dtype=np.int32)
+	type1err = np.count_nonzero(x == 1) # Rejected features the agent doesn't have
+	type2err = np.count_nonzero(x == -1) # Not rejected features the agent has
+	type1err_tot += type1err
+	type2err_tot += type2err
+	print("REAL AGENT MASK\n",sfMask,flush=True)
+	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
+	print("LR_LAMBDA\n",lr_lambda,flush=True)
+	print("Type 1 error frequency (last experiment):",np.float32(type1err)/50.0)
+	print("Type 2 error frequency (last experiment):",np.float32(type2err)/50.0)
+	print("Type 1 error frequency [",experiment_i+1,"]:",np.float32(type1err_tot)/50.0/np.float32(experiment_i+1))
+	print("Type 2 error frequency [",experiment_i+1,"]:",np.float32(type2err_tot)/50.0/np.float32(experiment_i+1))
+
+print("N = ",N)
+print("Type 1 error frequency:",np.float32(type1err_tot)/50.0/np.float32(NUM_EXPERIMENTS))
+print("Type 2 error frequency:",np.float32(type2err_tot)/50.0/np.float32(NUM_EXPERIMENTS))

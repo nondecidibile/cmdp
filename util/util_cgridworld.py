@@ -350,7 +350,7 @@ def updateSfBestModels(superLearner,eps,sfBestModels,meanModel,varModel,meanMode
 
 def lrTest(eps,sfMask,nsf=50,na=2):
 
-	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask))
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0))
 	super_policy = GaussianPolicy(nStateFeatures=nsf,actionDim=na)
 
 	params = super_policy.estimate_params(eps,setToZero=None)
@@ -358,7 +358,7 @@ def lrTest(eps,sfMask,nsf=50,na=2):
 
 	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
 	for param in range(nsf):
-		if sfMask[param]:
+		if sfMask[param]==False:
 			params_h0 = super_policy.estimate_params(eps,setToZero=param)
 			ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
 			bar.next()
@@ -372,7 +372,7 @@ def lrTest(eps,sfMask,nsf=50,na=2):
 	x = chi2.ppf(0.99,2)
 	for param in range(nsf):
 		if lr_lambda[param] > x:
-			sfMask[param] = False
+			sfMask[param] = True
 	
 	return lr_lambda
 
