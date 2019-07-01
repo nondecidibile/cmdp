@@ -9,6 +9,7 @@ import sys
 
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
+SAVE_STATE_IMAGES = False
 
 NUM_EXPERIMENTS = 25
 type1err_tot = 0
@@ -21,7 +22,7 @@ LEARNING_EPISODES = 100
 CONFIGURATION_STEPS = 100
 
 MAX_NUM_TRIALS = 3
-N = 1000 # number of episodes collected for the LR test and the configuration
+N = 100 # number of episodes collected for the LR test and the configuration
 
 for experiment_i in range(NUM_EXPERIMENTS):
 
@@ -47,7 +48,8 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	mdp.horizon = MDP_HORIZON
 	#mdp_uniform = gridworld_cont.GridworldContEnv()
 	#mdp_uniform.horizon = 50
-	saveStateImage("stateImage_"+str(experiment_i)+"_0A.png",initialMeanModel,varModel,sfTestMask)
+	if SAVE_STATE_IMAGES:
+		saveStateImage("stateImage_"+str(experiment_i)+"_0A.png",initialMeanModel,varModel,sfTestMask)
 
 	agent_policy_initial_model = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
 	agent_learner_initial_model = GpomdpLearner(mdp,agent_policy_initial_model,gamma=0.98)
@@ -73,7 +75,8 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	print("REAL AGENT MASK\n",sfMask,flush=True)
 	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
 	print("LR_LAMBDA\n",lr_lambda,flush=True)
-	saveStateImage("stateImage_"+str(experiment_i)+"_0B.png",initialMeanModel,varModel,sfTestMask)
+	if SAVE_STATE_IMAGES:
+		saveStateImage("stateImage_"+str(experiment_i)+"_0B.png",initialMeanModel,varModel,sfTestMask)
 
 	#
 	# Cycle ENVIRONMENT CONFIGURATION
@@ -124,7 +127,8 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		mdp.horizon = MDP_HORIZON
 		#mdp_uniform = gridworld_cont.GridworldContEnv()
 		#mdp_uniform.horizon = 50
-		saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"A.png",meanModel,varModel,sfTestMask)
+		if SAVE_STATE_IMAGES:
+			saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"A.png",meanModel,varModel,sfTestMask)
 
 		agent_policy = GaussianPolicy(nStateFeatures=np.count_nonzero(sfMask),actionDim=2)
 		agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
@@ -153,7 +157,8 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		print("Agent feature",nextIndex,"present:",sfMask[nextIndex],flush=True)
 		print("Estimated:",sfTestMask[nextIndex],flush=True)
 		print("Lr lambda =",lr_lambda[nextIndex],flush=True)
-		saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"B.png",meanModel,varModel,sfTestMask)
+		if SAVE_STATE_IMAGES:
+			saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"B.png",meanModel,varModel,sfTestMask)
 	
 	x = np.array(sfTestMask,dtype=np.int32)-np.array(sfMask,dtype=np.int32)
 	type1err = np.count_nonzero(x == 1) # Rejected features the agent doesn't have
