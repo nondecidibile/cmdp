@@ -90,7 +90,9 @@ class GaussianPolicy(Policy):
 		if setToZero is not None:
 			X = np.delete(X,setToZero,1)
 		
-		self.params = np.dot(np.dot(np.linalg.inv(np.dot(X.T,X)),X.T),A).T
+		self.params = np.linalg.lstsq(X, A, rcond=None)[0].T
+		#print(self.params)
+		#print(np.dot(np.dot(np.linalg.inv(np.dot(X.T,X)),X.T),A).T)
 
 		if setToZero is not None:
 			self.params = np.insert(self.params,setToZero,0,1)
