@@ -113,7 +113,7 @@ class GaussianPolicy(Policy):
 			sf_episode = eps_s[n]
 			a_episode = eps_a[n]
 
-			log_likelihood += self.compute_log(sf_episode,a_episode)
+			log_likelihood += self.compute_log(sf_episode[0:T],a_episode[0:T])
 		
 		return log_likelihood
 

@@ -22,7 +22,7 @@ LEARNING_EPISODES = 100
 CONFIGURATION_STEPS = 100
 
 MAX_NUM_TRIALS = 3
-N = 100 # number of episodes collected for the LR test and the configuration
+N = 30 # number of episodes collected for the LR test and the configuration
 
 for experiment_i in range(NUM_EXPERIMENTS):
 
