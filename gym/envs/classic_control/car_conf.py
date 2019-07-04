@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import multivariate_normal
 from tkinter import *
 import time
 
@@ -37,49 +38,59 @@ class Car:
 		self.angle = np.float32(0)
 		self.speed = np.float32(0)
 
-	def step(self, action): # force [-1,1], steering [-1,1]
+	def _step(self,pos,angle,speed,action):
 		acceleration = np.clip(action[0],-1,1)*self.maxAccel
 		steering = np.clip(action[1],-1,1)
-
-		self.speed += acceleration
-		self.speed = np.clip(self.speed,-self.maxSpeed,self.maxSpeed)
+		newspeed = np.clip(speed + acceleration,-self.maxSpeed,self.maxSpeed)
 
 		dtheta_coeff = np.float32(0)
-		if(abs(self.speed/self.maxSpeed)<0.1):
-			dtheta_coeff = 10.0*abs(self.speed/self.maxSpeed)
+		if(abs(newspeed/self.maxSpeed)<0.1):
+			dtheta_coeff = 10.0*abs(newspeed/self.maxSpeed)
 		else:
-			dtheta_coeff = 1.0-(abs(self.speed/self.maxSpeed)-0.1)*0.3
+			dtheta_coeff = 1.0-(abs(newspeed/self.maxSpeed)-0.1)*0.3
 		dtheta = steering*dtheta_coeff*self.maxAngularVel
-		self.angle += dtheta
+		newangle = angle + dtheta
 
-		self.pos[0] += -self.speed*np.sin(self.angle)
-		self.pos[1] += self.speed*np.cos(self.angle)
+		newpos = np.array([pos[0]-newspeed*np.sin(newangle),pos[1]+newspeed*np.cos(newangle)],dtype=np.float32)
+		return [newpos,newangle,newspeed]
+
+	def step(self, action): # force [-1,1], steering [-1,1]
+		newpos,newangle,newspeed = self._step(self.pos,self.angle,self.speed,action)
+		self.pos[0] = newpos[0]
+		self.pos[1] = newpos[1]
+		self.angle = newangle
+		self.speed = newspeed
 	
 	def printInfo(self):
 		print("CAR: Pos =",np.around(self.pos,decimals=2),". Speed =",np.around(self.speed,decimals=2),". Angle =",np.around(self.angle/(np.pi),decimals=2),"π.")
 
 class Road:
-	def __init__(self):
-		self.segmentSize = 100
-		self.roadWidth = 250
+	def __init__(self,model_w):
+		self.segmentSize = 500
+		self.roadWidth = 100
 
 		self.points = np.zeros(shape=(3,2),dtype=np.float32)
 		self.points[0] = np.array([0,0])
 		self.points[1] = np.array([0,self.segmentSize/2],dtype=np.float32)
 		self.points[2] = np.array([0,self.segmentSize])
 
-		self.mean = 0
-		self.stddev = 50
+		#self.mean = 0
+		#self.stddev = 50
+		self.model_w = model_w
 	
 	def reset(self):
-		self.points[1][0] = np.random.normal(self.mean,self.stddev)
+		#self.points[1][0] = np.random.normal(self.mean,self.stddev)
+		self.points[1][0] = self.model_w
 
 class ConfDrivingEnv:
-	def __init__(self, renderFlag=False):
+	def __init__(self, model_w, renderFlag=False):
 		self.car = Car()
-		self.road = Road()
+		self.road = Road(model_w)
 		self.renderFlag = renderFlag
 		self.sensorPoints = np.zeros(shape=(self.car.sensors.shape[0],2), dtype=np.float32)
+
+		self.sensorNoiseVariance = 0.1
+		self.model_w = model_w
 
 		if self.render:
 			self.window = Tk()
@@ -96,48 +107,89 @@ class ConfDrivingEnv:
 		self.car.sensorValues = np.ones(shape=self.car.sensors.shape[0],dtype=np.float32)
 
 		for sensor_i in range(self.sensorPoints.shape[0]):
-			#min_x = np.min([self.car.pos[0],self.car.pos[0]+self.sensorPoints[sensor_i,0]])
-			#max_x = np.max([self.car.pos[0],self.car.pos[0]+self.sensorPoints[sensor_i,0]])
-			min_y = np.min([self.car.pos[1],self.car.pos[1]+self.sensorPoints[sensor_i,1]])
-			max_y = np.max([self.car.pos[1],self.car.pos[1]+self.sensorPoints[sensor_i,1]])
 			alpha = self.car.pos
 			beta = self.car.pos+self.sensorPoints[sensor_i]
 			G = alpha[0]
 			H = beta[0]-alpha[0]
 			I = alpha[1]
 			J = beta[1]-alpha[1]
-			for segment_j in range(np.int32(min_y/self.road.segmentSize/2)*2,np.int32(max_y/self.road.segmentSize)+1):
-				#print("SENSOR =",sensor_i,"- SEGMENT =",segment_j)
-				if segment_j >= 0 and segment_j + 2 < self.road.nPoints and segment_j%2==0:
-					for side in range(2):
-						p0 = np.copy(self.road.points[segment_j])
-						p0[0] = p0[0] + (0.5-1*side)*self.road.roadWidth
-						p1 = np.copy(self.road.points[segment_j+1])
-						p1[0] = p1[0] + (0.5-1*side)*self.road.roadWidth
-						p2 = np.copy(self.road.points[segment_j+2])
-						p2[0] = p2[0] + (0.5-1*side)*self.road.roadWidth
-						A = p0[0]-2*p1[0]+p2[0]
-						B = 2*p1[0]-2*p0[0]
-						C = p0[0]
-						D = p0[1]-2*p1[1]+p2[1]
-						E = 2*p1[1]-2*p0[1]
-						F = p0[1]
-						L = A-H*D/J
-						M = B-H*E/J
-						N = C-G-H*(F-I)/J
-						Delta = (M**2) - (4*L*N)
-						if(Delta>0):
-							t_curve = np.array([(-M-np.sqrt(Delta))/(2*L),(-M+np.sqrt(Delta))/(2*L)])
-							t_sensr = D/J*(t_curve**2) + E/J*t_curve + (F-I)/J
-							if(t_curve[0]>0 and t_curve[0]<1 and t_sensr[0]>0 and t_sensr[0]<1):
-								if t_sensr[0]<self.car.sensorValues[sensor_i]:
-									self.car.sensorValues[sensor_i] = t_sensr[0]
-							if(t_curve[1]>0 and t_curve[1]<1 and t_sensr[1]>0 and t_sensr[1]<1):
-								if t_sensr[1]<self.car.sensorValues[sensor_i]:
-									self.car.sensorValues[sensor_i] = t_sensr[1]
-			self.car.sensorValues[sensor_i] += np.random.normal(loc=0.0,scale=0.1)
+			for side in range(2):
+				p0 = np.copy(self.road.points[0])
+				p0[0] = p0[0] + (0.5-1*side)*self.road.roadWidth
+				p1 = np.copy(self.road.points[1])
+				p1[0] = p1[0] + (0.5-1*side)*self.road.roadWidth
+				p2 = np.copy(self.road.points[2])
+				p2[0] = p2[0] + (0.5-1*side)*self.road.roadWidth
+				A = p0[0]-2*p1[0]+p2[0]
+				B = 2*p1[0]-2*p0[0]
+				C = p0[0]
+				D = p0[1]-2*p1[1]+p2[1]
+				E = 2*p1[1]-2*p0[1]
+				F = p0[1]
+				L = A-H*D/J
+				M = B-H*E/J
+				N = C-G-H*(F-I)/J
+				Delta = (M**2) - (4*L*N)
+				if(Delta>0):
+					t_curve = np.array([(-M-np.sqrt(Delta))/(2*L),(-M+np.sqrt(Delta))/(2*L)])
+					t_sensr = D/J*(t_curve**2) + E/J*t_curve + (F-I)/J
+					if(t_curve[0]>0 and t_curve[0]<1 and t_sensr[0]>0 and t_sensr[0]<1):
+						if t_sensr[0]<self.car.sensorValues[sensor_i]:
+							self.car.sensorValues[sensor_i] = t_sensr[0]
+					if(t_curve[1]>0 and t_curve[1]<1 and t_sensr[1]>0 and t_sensr[1]<1):
+						if t_sensr[1]<self.car.sensorValues[sensor_i]:
+							self.car.sensorValues[sensor_i] = t_sensr[1]
+			self.car.sensorValues[sensor_i] += np.random.normal(loc=0.0,scale=self.sensorNoiseVariance)
 			self.car.sensorValues[sensor_i] = np.clip(self.car.sensorValues[sensor_i],0,1)
 	
+	def _getSensorValues(self,pos,angle,model_w,get_dMean_dw=False):
+		sensorPoints = np.zeros(shape=(self.car.sensors.shape[0],2), dtype=np.float32)
+		sensorPoints[:,0] = -self.car.sensors[:,0]*np.sin(angle+self.car.sensors[:,1])
+		sensorPoints[:,1] = self.car.sensors[:,0]*np.cos(angle+self.car.sensors[:,1])
+		sensorValues = np.ones(shape=self.car.sensors.shape[0],dtype=np.float32)
+		if get_dMean_dw:
+			dMean_dw = np.zeros(shape=self.car.sensors.shape[0],dtype=np.float32)
+
+		for sensor_i in range(sensorPoints.shape[0]):
+			alpha = self.car.pos
+			beta = self.car.pos+self.sensorPoints[sensor_i]
+			G = alpha[0]
+			H = beta[0]-alpha[0]
+			I = alpha[1]
+			J = beta[1]-alpha[1]
+			for side in range(2):
+				p0 = np.copy(self.road.points[0])
+				p0[0] = p0[0] + (0.5-1*side)*self.road.roadWidth
+				p1 = np.copy(self.road.points[1])
+				p1[0] = model_w + (0.5-1*side)*self.road.roadWidth
+				p2 = np.copy(self.road.points[2])
+				p2[0] = p2[0] + (0.5-1*side)*self.road.roadWidth
+				A = p0[0]-2*p1[0]+p2[0]
+				B = 2*p1[0]-2*p0[0]
+				C = p0[0]
+				D = p0[1]-2*p1[1]+p2[1]
+				E = 2*p1[1]-2*p0[1]
+				F = p0[1]
+				L = A-H*D/J
+				M = B-H*E/J
+				N = C-G-H*(F-I)/J
+				Delta = (M**2) - (4*L*N)
+				if(Delta>0):
+					t_curve = np.array([(-M-np.sqrt(Delta))/(2*L),(-M+np.sqrt(Delta))/(2*L)])
+					t_sensr = D/J*(t_curve**2) + E/J*t_curve + (F-I)/J
+					if(t_curve[0]>0 and t_curve[0]<1 and t_sensr[0]>0 and t_sensr[0]<1):
+						if t_sensr[0]<sensorValues[sensor_i]:
+							sensorValues[sensor_i] = t_sensr[0]
+							if get_dMean_dw:
+								dMean_dw[sensor_i] = -2*E/J * (N/L/np.sqrt(Delta) + (np.sqrt(Delta)+M)/(2*L**2))
+					if(t_curve[1]>0 and t_curve[1]<1 and t_sensr[1]>0 and t_sensr[1]<1):
+						if t_sensr[1]<sensorValues[sensor_i]:
+							sensorValues[sensor_i] = t_sensr[1]
+							if get_dMean_dw:
+								dMean_dw[sensor_i] = -2*E/J * (-N/L/np.sqrt(Delta) - (np.sqrt(Delta)-M)/(2*L**2))
+			sensorValues[sensor_i] = np.clip(sensorValues[sensor_i],0,1)
+		return (sensorValues if not get_dMean_dw else [sensorValues,dMean_dw])
+
 	def _computeCollisions(self):
 		x1 = -self.car.dim*np.sin(self.car.angle+np.pi/6)+self.car.pos[0]
 		y1 = -self.car.dim*np.cos(self.car.angle+np.pi/6)+self.car.pos[1]
@@ -147,8 +199,6 @@ class ConfDrivingEnv:
 		y3 = -self.car.dim*np.cos(self.car.angle+np.pi+np.pi/6)+self.car.pos[1]
 		x4 = -self.car.dim*np.sin(self.car.angle-np.pi-np.pi/6)+self.car.pos[0]
 		y4 = -self.car.dim*np.cos(self.car.angle-np.pi-np.pi/6)+self.car.pos[1]
-		min_y = np.min([y1,y2,y3,y4])
-		max_y = np.max([y1,y2,y3,y4])
 		lines = [
 			[[x1,y1],[x2,y2]],
 			[[x2,y2],[x3,y3]],
@@ -161,56 +211,74 @@ class ConfDrivingEnv:
 			H = points[1][0]-points[0][0]
 			I = points[0][1]
 			J = points[1][1]-points[0][1]+0.0000001
-			for segment_j in range(np.int32(min_y/self.road.segmentSize/2)*2,np.int32(max_y/self.road.segmentSize)+1):
-				if segment_j >= 0 and segment_j + 2 < self.road.nPoints and segment_j%2==0:
-					for side in range(2):
-						p0 = np.copy(self.road.points[segment_j])
-						p0[0] = p0[0] + (0.5-1*side)*self.road.roadWidth
-						p1 = np.copy(self.road.points[segment_j+1])
-						p1[0] = p1[0] + (0.5-1*side)*self.road.roadWidth
-						p2 = np.copy(self.road.points[segment_j+2])
-						p2[0] = p2[0] + (0.5-1*side)*self.road.roadWidth
-						A = p0[0]-2*p1[0]+p2[0]
-						B = 2*p1[0]-2*p0[0]
-						C = p0[0]
-						D = p0[1]-2*p1[1]+p2[1]
-						E = 2*p1[1]-2*p0[1]
-						F = p0[1]
-						L = A-H*D/J
-						M = B-H*E/J
-						N = C-G-H*(F-I)/J
-						Delta = (M**2) - (4*L*N)
-						if(Delta>0):
-							t_curve = np.array([(-M-np.sqrt(Delta))/(2*L),(-M+np.sqrt(Delta))/(2*L)])
-							t_side = D/J*(t_curve**2) + E/J*t_curve + (F-I)/J
-							if(t_curve[0]>0 and t_curve[0]<1 and t_side[0]>0 and t_side[0]<1):
-								self.car.collision = True
-							if(t_curve[1]>0 and t_curve[1]<1 and t_side[1]>0 and t_side[1]<1):
-								self.car.collision = True
-						if self.car.collision:
-							break
+			for side in range(2):
+				p0 = np.copy(self.road.points[0])
+				p0[0] = p0[0] + (0.5-1*side)*self.road.roadWidth
+				p1 = np.copy(self.road.points[1])
+				p1[0] = p1[0] + (0.5-1*side)*self.road.roadWidth
+				p2 = np.copy(self.road.points[2])
+				p2[0] = p2[0] + (0.5-1*side)*self.road.roadWidth
+				A = p0[0]-2*p1[0]+p2[0]
+				B = 2*p1[0]-2*p0[0]
+				C = p0[0]
+				D = p0[1]-2*p1[1]+p2[1]
+				E = 2*p1[1]-2*p0[1]
+				F = p0[1]
+				L = A-H*D/J
+				M = B-H*E/J
+				N = C-G-H*(F-I)/J
+				Delta = (M**2) - (4*L*N)
+				if(Delta>0):
+					t_curve = np.array([(-M-np.sqrt(Delta))/(2*L),(-M+np.sqrt(Delta))/(2*L)])
+					t_side = D/J*(t_curve**2) + E/J*t_curve + (F-I)/J
+					if(t_curve[0]>0 and t_curve[0]<1 and t_side[0]>0 and t_side[0]<1):
+						self.car.collision = True
+					if(t_curve[1]>0 and t_curve[1]<1 and t_side[1]>0 and t_side[1]<1):
+						self.car.collision = True
 				if self.car.collision:
 					break
 			if self.car.collision:
 				break
 
 	def _getStateFeatures(self):
-		roadlen = self.road.segmentSize*(self.road.nPoints-1)
 		features = [
 			self.car.speed/self.car.maxSpeed,
 			np.sin(self.car.angle),
 			np.cos(self.car.angle),
-			self.car.pos[1]/roadlen
+			self.car.pos[0]/self.road.roadWidth,
+			self.car.pos[1]/self.road.segmentSize
 		]
 		state = np.append(self.car.sensorValues,features)
 		return state
+
+	def _getRealState(self,s):
+		pos = np.array([s[-2]*self.road.roadWidth,s[-1]*self.road.segmentSize],dtype=np.float32)
+		angle = np.arctan2(s[-4],s[-3])
+		speed = s[-5]*self.car.maxSpeed
+		return [pos,angle,speed]
+	
+	def p_model(self,newSensorValues,s,a,model_w):
+		pos,angle,speed = self._getRealState(s)
+		newpos,newangle,_ = self.car._step(pos,angle,speed,a)
+		newSensorsValuesMean = self._getSensorValues(newpos,newangle,model_w)
+		k = newSensorsValuesMean.size # num sensors
+		return multivariate_normal.pdf(newSensorValues,mean=newSensorsValuesMean,cov=self.sensorNoiseVariance*np.eye(k))
+
+	def grad_log_p_model(self,newSensorValues,s,a,model_w):
+		pos,angle,speed = self._getRealState(s)
+		newpos,newangle,_ = self.car._step(pos,angle,speed,a)
+		newSensorsValuesMean,dmean_dw = self._getSensorValues(newpos,newangle,model_w,get_dMean_dw=True)
+		k = newSensorsValuesMean.size # num sensors
+		df_dmean = np.dot(0.1*np.eye(k),newSensorValues-newSensorsValuesMean)
+		grad = np.dot(df_dmean,dmean_dw)
+		return grad
 
 	def step(self,action):
 		self.car.step(action)
 		self._computeSensorsValues()
 		self._computeCollisions()
 
-		roadlen = self.road.segmentSize*(self.road.nPoints-1)
+		roadlen = self.road.segmentSize
 		done = (self.car.collision or (self.car.pos[1] > roadlen) or (self.car.pos[1] < 0))
 		return [self._getStateFeatures(),(self.car.speed/self.car.maxSpeed),(self.car.collision or (self.car.pos[1] < 0)),done]
 		
@@ -222,15 +290,16 @@ class ConfDrivingEnv:
 
 		if self.renderFlag:
 			self.renderPoints = []
-			p1 = 
-			p2 = self.road.points[i+1]
-			p3 = self.road.points[i+2]
+			p0 = self.road.points[0]
+			p1 = self.road.points[1]
+			p2 = self.road.points[2]
 			for j in range(self.renderQuality):
-				alpha = j/self.renderQuality
-				a = np.array([lerp(p1[0],p2[0],alpha),lerp(p1[1],p2[1],alpha)])
-				b = np.array([lerp(p2[0],p3[0],alpha),lerp(p2[1],p3[1],alpha)])
+				alpha = j/(self.renderQuality-1)
+				a = np.array([lerp(p0[0],p1[0],alpha),lerp(p0[1],p1[1],alpha)])
+				b = np.array([lerp(p1[0],p2[0],alpha),lerp(p1[1],p2[1],alpha)])
 				P = np.array([lerp(a[0],b[0],alpha),lerp(a[1],b[1],alpha)])
 				self.renderPoints.append(P)
+			self.renderPoints.append(P)
 			self.renderPoints = np.array(self.renderPoints)
 		
 		return self._getStateFeatures()
@@ -247,10 +316,10 @@ class ConfDrivingEnv:
 		y4 = -self.car.dim*np.cos(self.car.angle-np.pi-np.pi/6)+self.window_Y*3/4
 		for i in range(-5,6):
 			self.canvas.create_line(self.road.segmentSize*i+self.window_X/2-self.car.pos[0], 0, self.road.segmentSize*i+self.window_X/2-self.car.pos[0], self.window_Y, fill='grey', width=1)
-		for i in range(0,self.road.nPoints):
+		for i in range(0,3):
 			self.canvas.create_line(0, self.window_Y*3/4-self.road.segmentSize*i+self.car.pos[1], self.window_X, self.window_Y*3/4-self.road.segmentSize*i+self.car.pos[1], fill='grey', width=1)
 		self.canvas.create_line(self.road.points[0,0]-self.road.roadWidth/2-self.car.pos[0]+self.window_X/2, self.window_Y*3/4-(self.road.points[0,1]-self.car.pos[1]), self.road.points[0,0]+self.road.roadWidth/2-self.car.pos[0]+self.window_X/2, self.window_Y*3/4-(self.road.points[0,1]-self.car.pos[1]), fill='blue', width=2)
-		self.canvas.create_line(self.road.points[self.road.nPoints-1,0]-self.road.roadWidth/2-self.car.pos[0]+self.window_X/2, self.window_Y*3/4-(self.road.points[self.road.nPoints-1,1]-self.car.pos[1]), self.road.points[self.road.nPoints-1,0]+self.road.roadWidth/2-self.car.pos[0]+self.window_X/2, self.window_Y*3/4-(self.road.points[self.road.nPoints-1,1]-self.car.pos[1]), fill='blue', width=2)
+		self.canvas.create_line(self.road.points[2,0]-self.road.roadWidth/2-self.car.pos[0]+self.window_X/2, self.window_Y*3/4-(self.road.points[2,1]-self.car.pos[1]), self.road.points[2,0]+self.road.roadWidth/2-self.car.pos[0]+self.window_X/2, self.window_Y*3/4-(self.road.points[2,1]-self.car.pos[1]), fill='blue', width=2)
 		
 		for i in range(self.renderPoints.shape[0]-1):
 			P = self.renderPoints[i]
