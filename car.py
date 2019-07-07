@@ -3,7 +3,7 @@ from util.util_car import *
 from util.policy_nn_gaussian import *
 from util.learner_nn import *
 
-mdp = car_conf.ConfDrivingEnv(model_w = 50, renderFlag=True)
+mdp = car_conf.ConfDrivingEnv(model_w = 0.1, renderFlag=True)
 mdp.horizon = 100
 
 '''
@@ -18,7 +18,7 @@ learner = nnGpomdpLearner(mdp,policy,gamma=0.996)
 
 learn(
 	learner = learner,
-	steps = 1000,
+	steps = 10,
 	nEpisodes = 10,
 	sfmask = None,
 	learningRate = 0.01,
@@ -26,9 +26,9 @@ learn(
 	printInfo = True
 )
 
-ep = collect_car_episode(mdp,policy,mdp.horizon,sfmask=None,render=True)
-states = ep[0]["s"]
-actions = ep[0]["a"]
+eps = collect_car_episodes(mdp,policy,10,mdp.horizon,sfmask=None,render=False,showProgress=True)
 
-print(mdp.p_model(states[1][0:7],states[0],actions[0],50))
-print(mdp.grad_log_p_model(states[1][0:7],states[0],actions[0],50))
+sfGradientMask = np.zeros(shape=12,dtype=np.bool)
+sfGradientMask[0] = True
+g = getModelGradient(learner,eps, sfTarget=0, model_w_new=15, model_w=10)
+print(g)

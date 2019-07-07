@@ -153,3 +153,48 @@ def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient
 		#policy.print_params()
 		if step>0 and step%5==0:
 			collect_car_episode(learner.mdp,learner.policy,learner.mdp.horizon,sfmask=sfmask,render=True)
+	
+
+def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
+	
+	N = len(eps["len"])
+	Tmax = max(eps["len"])
+	n_policy_params = superLearner.policy.nParams
+
+	mdp = superLearner.mdp
+	policy = superLearner.policy
+	sf = eps["s"]
+	a = eps["a"]
+	r = eps["r"]
+
+	dr = np.zeros(shape=(N,Tmax),dtype=np.float32)
+	policy_log_grads = np.zeros(shape=(N,Tmax,n_policy_params),dtype=np.float32)
+	model_log_grads = np.zeros(shape=(N,Tmax),dtype=np.float32)
+	is_ratios = np.zeros(shape=(N,Tmax),dtype=np.float32)
+
+	pgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
+	mgradpgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
+
+	model_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
+	policy_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
+	is_ratios_t = np.float32(1)
+
+	for n in range(N):
+		T = eps["len"][n]
+		for t in range(T):
+			dr[n,t] = (superLearner.gamma**t) * r[n,t]
+			policy_log_grads[n,t] = policy.compute_log_gradient(sf[n,t],a[n,t])
+			policy_log_grad_t += policy_log_grads[n,t]
+			if t<T-1:
+				model_log_grads[n,t] = mdp.grad_log_p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new)
+				model_log_grad_t += model_log_grads[n,t]
+				is_ratios[n,t] = mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new) / mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w)
+				is_ratios_t *= is_ratios[n,t]
+			pgrad_t = dr[n,t]*policy_log_grad_t*(is_ratios_t if t<T-1 else 1)
+			pgrad += pgrad_t
+			mgradpgrad += pgrad_t*(model_log_grad_t if t<T-1 else 1)
+	pgrad /= N
+	mgradpgrad /= N
+
+	wnum = policy.params["w1"].shape[1]
+	return np.dot(pgrad[sfTarget*wnum:(sfTarget+1)*wnum],mgradpgrad[sfTarget*wnum:(sfTarget+1)*wnum])
