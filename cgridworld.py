@@ -167,7 +167,6 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	type2err_tot += type2err
 	print("REAL AGENT MASK\n",sfMask,flush=True)
 	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
-	print("LR_LAMBDA\n",lr_lambda,flush=True)
 	print("Type 1 error frequency (last experiment):",np.float32(type1err)/50.0)
 	print("Type 2 error frequency (last experiment):",np.float32(type2err)/50.0)
 	print("Type 1 error frequency [",experiment_i+1,"]:",np.float32(type1err_tot)/50.0/np.float32(experiment_i+1))

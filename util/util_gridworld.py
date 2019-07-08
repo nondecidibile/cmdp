@@ -329,15 +329,15 @@ def getModelGradient(superLearner, eps, sfGradientMask, model, model2):
 def lrTest(eps,sfMask,lr=0.03,epsilon=0.001,maxSteps=1000):
 
 	super_policy = BoltzmannPolicy(17,4)
-	optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
+	optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=lr)
 
-	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask))
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0))
 	params = super_policy.estimate_params(eps,optimizer,setToZero=None,epsilon=0.001,minSteps=100,maxSteps=1000,printInfo=False)
 	ll = super_policy.getLogLikelihood(eps,params)
 	ll_h0 = np.zeros(shape=(16),dtype=np.float32)
 	for param in range(16):
-		if sfMask[param]:
-			optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=0.3)
+		if not sfMask[param]:
+			optimizer = AdamOptimizer(super_policy.paramsShape,learning_rate=lr)
 			params_h0 = super_policy.estimate_params(eps,optimizer,setToZero=param,epsilon=0.001,minSteps=100,maxSteps=1000,printInfo=False)
 			ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
 			bar.next()
@@ -350,7 +350,7 @@ def lrTest(eps,sfMask,lr=0.03,epsilon=0.001,maxSteps=1000):
 	x = chi2.ppf(0.99,4)
 	for param in range(16):
 		if lr_lambda[param] > x:
-			sfMask[param] = False
+			sfMask[param] = True
 	
 	return lr_lambda
 
