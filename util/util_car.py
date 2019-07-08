@@ -175,12 +175,11 @@ def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 	pgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
 	mgradpgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
 
-	model_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
-	policy_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
-	is_ratios_t = np.float32(1)
-
 	for n in range(N):
 		T = eps["len"][n]
+		model_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
+		policy_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
+		is_ratios_t = np.float32(1)
 		for t in range(T):
 			dr[n,t] = (superLearner.gamma**t) * r[n,t]
 			policy_log_grads[n,t] = policy.compute_log_gradient(sf[n,t],a[n,t])
