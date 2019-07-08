@@ -29,10 +29,14 @@ N = 1000 # number of episodes collected for the LR test and the configuration
 for experiment_i in range(NUM_EXPERIMENTS):
 
 	print("\nExperiment",experiment_i,flush=True)
-	w_row = np.random.uniform(low=1,high=5,size=5)
-	w_col = np.random.uniform(low=1,high=5,size=5)
-	w_grow = np.random.uniform(low=1,high=5,size=5)
-	w_gcol = np.random.uniform(low=1,high=5,size=5)
+	w_row = np.ones(5,dtype=np.float32)
+	w_row[np.random.choice(5)] *= 5
+	w_col = np.ones(5,dtype=np.float32)
+	w_col[np.random.choice(5)] *= 5
+	w_grow = np.ones(5,dtype=np.float32)
+	w_grow[np.random.choice(5)] *= 5
+	w_gcol = np.ones(5,dtype=np.float32)
+	w_gcol[np.random.choice(5)] *= 5
 	initialModel = np.array([w_row,w_col,w_grow,w_gcol],dtype=np.float32)
 
 	sfMask = np.random.choice(a=[False, True], size=(16), p=[0.5, 0.5])
@@ -79,7 +83,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
 	print("LR_LAMBDA\n",lr_lambda,flush=True)
 	if SAVE_STATE_IMAGES:
-		saveStateImage("stateImage_"+str(experiment_i)+"_0B.png",initialModel,sfTestMask)
+		saveStateImage("stateImage_"+str(experiment_i)+"_0B.png",mdp,sfTestMask)
 
 
 	#
@@ -107,7 +111,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		if nextIndex == -1:
 			print("Tested every not rejected feature",MAX_NUM_TRIALS,"times. End of the experiment.",flush=True)
 			break
-		sfGradientMask = np.zeros(shape=16,dtype=np.bool)
+		sfGradientMask = np.zeros(shape=17,dtype=np.bool)
 		sfGradientMask[nextIndex] = True
 		print("Iteration",conf_index,"\nConfiguring model to test parameter",nextIndex,flush=True)
 
@@ -128,7 +132,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		mdp = gridworld.GridworldEnv(model)
 		mdp.horizon = MDP_HORIZON
 		if SAVE_STATE_IMAGES:
-			saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"A.png",model,sfTestMask)
+			saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"A.png",mdp,sfTestMask)
 		
 		agent_policy = BoltzmannPolicy(np.count_nonzero(sfMask),4)
 		agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.98)
@@ -159,7 +163,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		print("Estimated:",sfTestMask[nextIndex],flush=True)
 		print("Lr lambda =",lr_lambda[nextIndex],flush=True)
 		if SAVE_STATE_IMAGES:
-			saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"B.png",model,sfTestMask)
+			saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"B.png",mdp,sfTestMask)
 
 	x = np.array(sfTestMask,dtype=np.int32)-np.array(sfMask,dtype=np.int32)
 	type1err = np.count_nonzero(x == 1) # Rejected features the agent doesn't have
