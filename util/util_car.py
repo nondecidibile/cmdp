@@ -2,6 +2,7 @@ import numpy as np
 from progress.bar import Bar
 import matplotlib.pyplot as plt
 from util.optimizer import *
+from scipy.stats import chi2
 
 
 def build_state_features(state,sfmask=None):
@@ -152,8 +153,9 @@ def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient
 		
 		#policy.print_params()
 		if step>0 and step%5==0:
-			collect_car_episode(learner.mdp,learner.policy,learner.mdp.horizon,sfmask=sfmask,render=True)
-	
+			if learner.mdp.renderFlag:
+				collect_car_episode(learner.mdp,learner.policy,learner.mdp.horizon,sfmask=sfmask,render=True)
+
 
 def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 	
@@ -175,9 +177,12 @@ def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 	pgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
 	mgradpgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
 
+	d2 = np.float32(0)
+	mgrad_d2 = np.float32(0)
+
 	for n in range(N):
 		T = eps["len"][n]
-		model_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
+		model_log_grad_t = np.float32(0)
 		policy_log_grad_t = np.zeros(shape=(n_policy_params),dtype=np.float32)
 		is_ratios_t = np.float32(1)
 		for t in range(T):
@@ -189,11 +194,51 @@ def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 				model_log_grad_t += model_log_grads[n,t]
 				is_ratios[n,t] = mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new) / mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w)
 				is_ratios_t *= is_ratios[n,t]
+				d2 += (superLearner.gamma**(2*t))*(is_ratios_t**2)
+				mgrad_d2 += (superLearner.gamma**(2*t))*2*(is_ratios_t**2)*model_log_grad_t
 			pgrad_t = dr[n,t]*policy_log_grad_t*(is_ratios_t if t<T-1 else 1)
 			pgrad += pgrad_t
 			mgradpgrad += pgrad_t*(model_log_grad_t if t<T-1 else 1)
 	pgrad /= N
 	mgradpgrad /= N
+	d2 /= N
 
 	wnum = policy.params["w1"].shape[1]
-	return np.dot(pgrad[sfTarget*wnum:(sfTarget+1)*wnum],mgradpgrad[sfTarget*wnum:(sfTarget+1)*wnum])
+	model_term = np.dot(pgrad[sfTarget*wnum:(sfTarget+1)*wnum],mgradpgrad[sfTarget*wnum:(sfTarget+1)*wnum])
+
+	lambda_param = 1/4
+	d2_term = lambda_param/(2*np.sqrt(N))*mgrad_d2/np.sqrt(d2)
+
+	return model_term - d2_term
+
+
+def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.03,batchSize=25,epsilon=0.001,maxSteps=1000):
+
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0))
+
+	#policyInstance.estimate_params(eps,lr,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+	#ll = policyInstance.getLogLikelihood(eps)
+
+	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
+	ll_tot = np.zeros(shape=(nsf),dtype=np.float32)
+	for feature in range(nsf):
+		if not sfMask[feature]:
+			params0 = policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+			ll_h0[feature] = policyInstance.getLogLikelihood(eps)
+			policyInstance.estimate_params(eps,lr,params0=params0,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+			ll_tot[feature] = policyInstance.getLogLikelihood(eps)
+			bar.next()
+
+	bar.finish()
+
+	print("Log likelihood without i-th feature:",ll_h0)
+	print("Log likelihood with every feature:  ",ll_tot)
+	lr_lambda = -2*(ll_h0 - ll_tot)
+	print("lr lambda: ",lr_lambda)
+
+	x = chi2.ppf(0.99,policyInstance.nHiddenNeurons)
+	for param in range(nsf):
+		if lr_lambda[param] > x:
+			sfMask[param] = True
+
+	return lr_lambda

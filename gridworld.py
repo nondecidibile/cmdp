@@ -165,12 +165,12 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		if SAVE_STATE_IMAGES:
 			saveStateImage("stateImage_"+str(experiment_i)+"_"+str(conf_index)+"B.png",mdp,sfTestMask)
 
-	x = np.array(sfTestMask,dtype=np.int32)-np.array(sfMask,dtype=np.int32)
+	x = np.array(sfTestMask,dtype=np.int32)-np.array(sfMask[0:16],dtype=np.int32)
 	type1err = np.count_nonzero(x == 1) # Rejected features the agent doesn't have
 	type2err = np.count_nonzero(x == -1) # Not rejected features the agent has
 	type1err_tot += type1err
 	type2err_tot += type2err
-	print("REAL AGENT MASK\n",sfMask,flush=True)
+	print("REAL AGENT MASK\n",sfMask[0:16],flush=True)
 	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
 	print("Type 1 error frequency (last experiment):",np.float32(type1err)/16.0)
 	print("Type 2 error frequency (last experiment):",np.float32(type2err)/16.0)
