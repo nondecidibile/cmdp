@@ -11,7 +11,7 @@ learner = nnGpomdpLearner(mdp,policy,gamma=0.996)
 
 learn(
 	learner = learner,
-	steps = 10,
+	steps = 0,
 	nEpisodes = 10,
 	sfmask = None,
 	learningRate = 0.01,
@@ -19,12 +19,15 @@ learn(
 	printInfo = True
 )
 
+params = np.load("car_params.npy")
+policy.set_params(params)
+
 eps = collect_car_episodes(mdp,policy,25,mdp.horizon,sfmask=None,render=False,showProgress=True)
 
-mdp.model_w += 0.1
+mdp.model_w += 1
 for i in range(250):
 	sfGradientMask = np.zeros(shape=12,dtype=np.bool)
 	sfGradientMask[0] = True
 	g = getModelGradient(learner,eps, sfTarget=0, model_w_new=mdp.model_w, model_w=0.1)
-	mdp = car_conf.ConfDrivingEnv(model_w = mdp.model_w+0.01*g, renderFlag=True)
-	print(mdp.model_w)
+	mdp = car_conf.ConfDrivingEnv(model_w = mdp.model_w+np.clip(0.03*g,-5,5), renderFlag=True)
+	print("NEW MODEL =",mdp.model_w)

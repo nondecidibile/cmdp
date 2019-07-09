@@ -112,15 +112,12 @@ def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient
 
 		mean_length = np.mean(eps["len"])
 		avg_mean_length = avg_mean_length*avg+mean_length*(1-avg)
-		avg_mean_length_t = avg_mean_length/(1-mt)
 		#print("Average mean length: "+str(np.round(avg_mean_length_t,3)))
 		max_gradient = np.max(np.abs(gradient))
 		avg_max_gradient = avg_max_gradient*avg+max_gradient*(1-avg)
-		avg_max_gradient_t = avg_max_gradient/(1-mt)
 		#print("Avg maximum gradient: "+str(np.round(avg_max_gradient_t,5)))
 		mean_gradient = np.mean(np.abs(gradient))
 		avg_mean_gradient = avg_mean_gradient*avg+mean_gradient*(1-avg)
-		avg_mean_gradient_t = avg_mean_gradient/(1-mt)
 		#print("Avg mean gradient: "+str(np.round(avg_mean_gradient_t,5))+"\n")
 		mean_reward = np.mean(eps["r"])
 		mt = mt*avg

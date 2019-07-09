@@ -151,8 +151,8 @@ class ConfDrivingEnv:
 			dMean_dw = np.zeros(shape=self.car.sensors.shape[0],dtype=np.float32)
 
 		for sensor_i in range(sensorPoints.shape[0]):
-			alpha = self.car.pos
-			beta = self.car.pos+self.sensorPoints[sensor_i]
+			alpha = pos
+			beta = pos+self.sensorPoints[sensor_i]
 			G = alpha[0]
 			H = beta[0]-alpha[0]
 			I = alpha[1]
