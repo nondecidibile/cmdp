@@ -78,7 +78,7 @@ def collect_car_episodes(mdp,policy,num_episodes,horizon,sfmask=None,render=Fals
 	return data
 
 
-def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient=False, printInfo=False):
+def learn(learner, steps, nEpisodes, initParams=None, sfmask=None, learningRate=0.1, plotGradient=False, printInfo=False):
 	
 	if steps<=0 or steps is None:
 		plotGradient = False
@@ -95,6 +95,8 @@ def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient
 		plt.ylabel('Mean gradient')
 	
 	learner.policy.s.run(learner.policy.init_op)
+	if initParams is not None:
+		learner.policy.set_params(initParams)
 	optimizer = AdamOptimizer(learner.policy.nParams, learning_rate=learningRate, beta1=0.9, beta2=0.99)
 
 	avg = 0.95
@@ -195,10 +197,10 @@ def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 			if t<T-1:
 				model_log_grads[n,t] = mdp.grad_log_p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new)
 				model_log_grad_t += model_log_grads[n,t]
-				model_log_grads_d2_2nd[n,t] = model_log_grad_t
+				model_log_grads_d2_2nd[n,t] = np.copy(model_log_grad_t)
 
 				is_ratio_t *= mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new)/mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w)
-				is_ratio_d2_2nd[n,t] = is_ratio_t		# 2nd d2 estimator
+				is_ratio_d2_2nd[n,t] = np.copy(is_ratio_t)		# 2nd d2 estimator
 				#d2 += (gamma**t)*(gamma**t+2*gamma**(t+1)-2*gamma**T)*(is_ratio_t**2)
 				#mgrad_d2 += 2*(gamma**t)*(gamma**t+2*gamma**(t+1)-2*gamma**T)*(is_ratio_t**2)*model_log_grad_t
 
@@ -222,12 +224,12 @@ def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 				mgrad_d2_t += 2*(is_ratio_d2_2nd[n,t]-1)*is_ratio_d2_2nd[n,t]*model_log_grads_d2_2nd[n,t]
 		d2_t /= N
 		d2_t += 1
-		d2 += (gamma**t)*(gamma**t+2*gamma**(t+1)-2*gamma**Tmax)*d2_t
+		d2 += (gamma**t)*(gamma**t+2*(gamma**(t+1))-2*(gamma**Tmax))*d2_t
 		mgrad_d2 /= N
-		mgrad_d2 += (gamma**t)*(gamma**t+2*gamma**(t+1)-2*gamma**Tmax)*mgrad_d2_t
+		mgrad_d2 += (gamma**t)*(gamma**t+2*(gamma**(t+1))-2*(gamma**Tmax))*mgrad_d2_t
 	d2 /= (1-gamma)
 	mgrad_d2 /= (1-gamma)
-
+	
 	wnum = policy.params["w1"].shape[1]
 	model_term = np.dot(pgrad[sfTarget*wnum:(sfTarget+1)*wnum],mgradpgrad[sfTarget*wnum:(sfTarget+1)*wnum])
 

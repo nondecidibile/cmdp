@@ -92,15 +92,15 @@ class nnGaussianPolicy(Policy):
 		N = range(len(data["len"]))
 		optimizer = tf.train.AdamOptimizer(learning_rate=lr,beta1=0.9,beta2=0.999)
 		train_op = optimizer.minimize(loss=self.neg_log_likelihood)
+		
+		init_op = tf.global_variables_initializer()
+		self.s.run(init_op)
 
 		old_params = self.get_params()
 		if nullFeature is not None:
 			w = self.params["w1"].eval(self.s)
 			w[nullFeature,:] = 0
 			self.s.run(self.params["w1"].assign(w))
-		
-		init_op = tf.global_variables_initializer()
-		self.s.run(init_op)
 
 		if params0 is not None:
 			self.set_params(params0)
