@@ -92,15 +92,20 @@ class nnGaussianPolicy(Policy):
 		N = range(len(data["len"]))
 		optimizer = tf.train.AdamOptimizer(learning_rate=lr,beta1=0.9,beta2=0.999)
 		train_op = optimizer.minimize(loss=self.neg_log_likelihood)
+		if nullFeature is not None:
+			setToZeroOp = tf.scatter_update(self.params["w1"],[nullFeature],0)
 		
 		init_op = tf.global_variables_initializer()
 		self.s.run(init_op)
 
 		old_params = self.get_params()
 		if nullFeature is not None:
+			self.s.run(setToZeroOp)
+			'''
 			w = self.params["w1"].eval(self.s)
 			w[nullFeature,:] = 0
 			self.s.run(self.params["w1"].assign(w))
+			'''
 
 		if params0 is not None:
 			self.set_params(params0)
@@ -119,11 +124,14 @@ class nnGaussianPolicy(Policy):
 				self.inputLayer: np.reshape(data_s,newshape=(-1,self.nStateFeatures)),
 				self.action_ph: np.reshape(data_a,newshape=(-1,self.actionDim))
 			})
-
+			
 			if nullFeature is not None:
+				self.s.run(setToZeroOp)
+				'''
 				w = self.params["w1"].eval(self.s)
 				w[nullFeature,:] = 0
 				self.s.run(self.params["w1"].assign(w))
+				'''
 			params = self.get_params()
 			update_size = np.linalg.norm(np.ravel(np.asarray(params-old_params)),np.inf)
 			old_params = params

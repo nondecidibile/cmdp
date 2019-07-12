@@ -92,7 +92,7 @@ class ConfDrivingEnv:
 		self.sensorNoiseVariance = 0.1
 		self.model_w = model_w
 
-		if self.render:
+		if self.renderFlag:
 			self.window = Tk()
 			self.window_X = 500
 			self.window_Y = 500

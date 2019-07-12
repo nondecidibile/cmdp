@@ -10,22 +10,22 @@ NUM_EXPERIMENTS = 25
 type1err_tot = 0
 type2err_tot = 0
 
-MDP_HORIZON = 50
+MDP_HORIZON = 100
 MDP_GAMMA = 0.996
-LEARNING_STEPS = 25
+LEARNING_STEPS = 100
 LEARNING_EPISODES = 10
 
 CONFIGURATION_STEPS = 100
 
 MAX_NUM_TRIALS = 3
-N = 25 # number of episodes collected for the LR test and the configuration
+N = 100 # number of episodes collected for the LR test and the configuration
 
 policy = nnGaussianPolicy(nStateFeatures=12,actionDim=2,nHiddenNeurons=16,paramInitMaxVal=0.01,variance=0.1)
 
 for experiment_i in range(NUM_EXPERIMENTS):
 
 	print("\nExperiment",experiment_i,flush=True)
-	initialModel = -25+np.random.rand()*50
+	initialModel = -50+np.random.rand()*100
 	if abs(initialModel)<0.1:
 		initialModel = 0.1
 	
@@ -59,7 +59,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	eps_initial_model = collect_car_episodes(mdp,policy,N,mdp.horizon,sfmask=None,render=False,showProgress=True)
 
 	# Test parameters
-	lr_lambda = lrTest(eps_initial_model,policy,sfTestMask)
+	lr_lambda = lrTest(eps_initial_model,policy,sfTestMask,batchSize=np.int(N/5))
 	print("REAL AGENT MASK\n",sfMask,flush=True)
 	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
 	print("LR_LAMBDA\n",lr_lambda,flush=True)
@@ -82,7 +82,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 			if sfTestTrials[i] < MAX_NUM_TRIALS:
 				nextIndex = i
 				if(sfTestTrials[i]==0):
-					meanModel = initialModel.copy()
+					meanModel = np.copy(initialModel)
 					eps = eps_initial_model
 					learner = learner_initial_model
 				sfTestTrials[i] += 1
@@ -90,8 +90,6 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		if nextIndex == -1:
 			print("Tested every not rejected feature",MAX_NUM_TRIALS,"times. End of the experiment.",flush=True)
 			break
-		sfGradientMask = np.zeros(shape=50,dtype=np.bool)
-		sfGradientMask[nextIndex] = True
 		print("Iteration",conf_index,"\nConfiguring model to test parameter",nextIndex,flush=True)
 		
 		meanModel2 = np.copy(meanModel)
@@ -99,8 +97,8 @@ for experiment_i in range(NUM_EXPERIMENTS):
 
 		modelOptimizer = AdamOptimizer(1, learning_rate=1.0)
 		for _i in range(CONFIGURATION_STEPS):
-			modelGradient = getModelGradient(learner,eps,sfGradientMask,meanModel2,meanModel)
-			meanModel2 += modelOptimizer.step(modelGradient)
+			modelGradient = getModelGradient(learner,eps,nextIndex,meanModel2,meanModel)
+			meanModel2 += modelOptimizer.step(modelGradient)[0]
 		
 		meanModel = np.copy(meanModel2)
 		print("Using MDP with mean =",meanModel,flush=True)
@@ -124,7 +122,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		# Test parameters
 		sfTestMask_single = np.ones(shape=sfTestMask.size,dtype=np.bool)
 		sfTestMask_single[nextIndex] = False
-		lr_lambda = lrTest(eps,policy,sfTestMask_single)
+		lr_lambda = lrTest(eps,policy,sfTestMask_single,batchSize=np.int(N/5))
 		sfTestMask[nextIndex] = sfTestMask_single[nextIndex]
 		print("Agent feature",nextIndex,"present:",sfMask[nextIndex],flush=True)
 		print("Estimated:",sfTestMask[nextIndex],flush=True)
