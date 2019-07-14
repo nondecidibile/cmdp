@@ -156,22 +156,20 @@ def learn(learner, steps, nEpisodes, initParams=None, sfmask=None, learningRate=
 				collect_car_episode(learner.mdp,learner.policy,learner.mdp.horizon,sfmask=sfmask,render=True)
 
 
-def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
+def getModelGradient(superLearner, eps, Neps, sfTarget, model_w_new, model_w):
 	
-	N = len(eps["len"])
-	Tmax = max(eps["len"])
+	N = Neps
+	Tmax = max(eps["len"][:N])
 	n_policy_params = superLearner.policy.nParams
 
 	mdp = superLearner.mdp
 	policy = superLearner.policy
 	gamma = superLearner.gamma
-	sf = eps["s"]
-	a = eps["a"]
-	r = eps["r"]
+	sf = eps["s"][:N]
+	a = eps["a"][:N]
+	r = eps["r"][:N]
 
 	dr = np.zeros(shape=(N,Tmax),dtype=np.float32)
-	policy_log_grads = np.zeros(shape=(N,Tmax,n_policy_params),dtype=np.float32)
-	model_log_grads = np.zeros(shape=(N,Tmax),dtype=np.float32)
 
 	pgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
 	mgradpgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
@@ -191,12 +189,10 @@ def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 		for t in range(T):
 			dr[n,t] = (gamma**t) * r[n,t]
 
-			policy_log_grads[n,t] = policy.compute_log_gradient(sf[n,t],a[n,t])
-			policy_log_grad_t += policy_log_grads[n,t]
+			policy_log_grad_t += policy.compute_log_gradient(sf[n,t],a[n,t])
 
 			if t<T-1:
-				model_log_grads[n,t] = mdp.grad_log_p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new)
-				model_log_grad_t += model_log_grads[n,t]
+				model_log_grad_t += mdp.grad_log_p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new)
 				model_log_grads_d2_2nd[n,t] = np.copy(model_log_grad_t)
 
 				is_ratio_t *= mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w_new)/mdp.p_model(sf[n,t+1][0:7],sf[n,t],a[n,t],model_w)
@@ -236,14 +232,14 @@ def getModelGradient(superLearner, eps, sfTarget, model_w_new, model_w):
 	lambda_param = 1/4
 	d2_term = lambda_param/(2*np.sqrt(N))*mgrad_d2/np.sqrt(d2)
 
-	#print("\nd2        =",d2)
-	#print("model_term  =",model_term)
-	#print("d2_term     =",d2_term)
+	print("\nd2        =",d2,flush=True)
+	print("model_term  =",model_term,flush=True)
+	print("d2_term     =",d2_term,flush=True)
 
 	return model_term - d2_term
 
 
-def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.003,batchSize=25,epsilon=0.0001,maxSteps=10000):
+def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.003,batchSize=25,epsilon=0.0001,maxSteps=1000):
 
 	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0))
 
@@ -254,7 +250,7 @@ def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.003,batchSize=25,epsilon=0
 	ll_tot = np.zeros(shape=(nsf),dtype=np.float32)
 	for feature in range(nsf):
 		if not sfMask[feature]:
-			params0 = policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
+			params0 = policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=True)
 			ll_h0[feature] = policyInstance.getLogLikelihood(eps)
 			policyInstance.estimate_params(eps,lr,params0=params0,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
 			ll_tot[feature] = policyInstance.getLogLikelihood(eps)

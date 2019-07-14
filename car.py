@@ -11,14 +11,15 @@ type1err_tot = 0
 type2err_tot = 0
 
 MDP_HORIZON = 100
-MDP_GAMMA = 0.996
-LEARNING_STEPS = 100
+MDP_GAMMA = 0.99
+LEARNING_STEPS = 25
 LEARNING_EPISODES = 10
 
-CONFIGURATION_STEPS = 100
+CONFIGURATION_STEPS = 50
 
 MAX_NUM_TRIALS = 3
-N = 100 # number of episodes collected for the LR test and the configuration
+N = 2500 # number of episodes collected for the LR test
+Nconf = 50 # number of episodes to use for the configuration (<= N)
 
 policy = nnGaussianPolicy(nStateFeatures=12,actionDim=2,nHiddenNeurons=16,paramInitMaxVal=0.01,variance=0.1)
 
@@ -97,13 +98,13 @@ for experiment_i in range(NUM_EXPERIMENTS):
 
 		modelOptimizer = AdamOptimizer(1, learning_rate=1.0)
 		for _i in range(CONFIGURATION_STEPS):
-			modelGradient = getModelGradient(learner,eps,nextIndex,meanModel2,meanModel)
+			modelGradient = getModelGradient(learner,eps,Nconf,nextIndex,meanModel2,meanModel)
 			meanModel2 += modelOptimizer.step(modelGradient)[0]
 		
 		meanModel = np.copy(meanModel2)
 		print("Using MDP with mean =",meanModel,flush=True)
 
-		mdp = car_conf.ConfDrivingEnv(model_w = meanModel, renderFlag=True)
+		mdp = car_conf.ConfDrivingEnv(model_w = meanModel, renderFlag=False)
 		mdp.horizon = MDP_HORIZON
 
 		learner = nnGpomdpLearner(mdp,policy,gamma=MDP_GAMMA)
