@@ -239,7 +239,7 @@ def getModelGradient(superLearner, eps, Neps, sfTarget, model_w_new, model_w):
 	return model_term - d2_term
 
 
-def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.003,batchSize=25,epsilon=0.0001,maxSteps=1000):
+def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.01,batchSize=100,epsilon=0.0001,maxSteps=10000):
 
 	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0))
 

@@ -19,20 +19,30 @@ learn(
 	steps = 0,
 	initParams=params,
 	nEpisodes = 10,
-	sfmask = None,
+	sfmask=np.array([1,1,1,1,1,1,1,1,1,1,1,1],dtype=np.bool),
 	learningRate = 0.003,
 	plotGradient = False,
 	printInfo = True
 )
 
-#np.save("car_params.npy",policy.get_params())
+#np.save("car_params_1.npy",policy.get_params())
 
-eps = collect_car_episodes(mdp,policy,250,mdp.horizon,sfmask=None,render=False,showProgress=True)
+N = 250
 
-estimated_params = policy.estimate_params(eps,lr=0.01,batchSize=50, epsilon=0.0001, minSteps=50, maxSteps=10000)
+eps = collect_car_episodes(mdp,policy,N,mdp.horizon,sfmask=None,render=False,showProgress=True)
 
-print(params)
-print(estimated_params)
+estimated_params_0 = policy.estimate_params(eps,nullFeature=0,lr=0.01,batchSize=100)
+ll0 = policy.getLogLikelihood(eps)
+estimated_params_0 = policy.estimate_params(eps,nullFeature=1,lr=0.01,batchSize=100)
+ll1 = policy.getLogLikelihood(eps)
+estimated_params = policy.estimate_params(eps,lr=0.01,batchSize=100)
+ll = policy.getLogLikelihood(eps)
+
+lr_lambda_0 = -2*(ll0 - ll)
+lr_lambda_1 = -2*(ll1 - ll)
+print("lr lambda: ",lr_lambda_0,lr_lambda_1)
+x = chi2.ppf(0.99,policy.nHiddenNeurons)
+print("chi2: ",x)
 
 '''
 optimizer = AdamOptimizer(1, learning_rate=1.0, beta1=0.9, beta2=0.99)
@@ -40,7 +50,7 @@ mdp.model_w += 5
 for i in range(250):
 	sfGradientMask = np.zeros(shape=12,dtype=np.bool)
 	sfGradientMask[0] = True
-	g = getModelGradient(learner,eps, sfTarget=0, model_w_new=mdp.model_w, model_w=0.1)
+	g = getModelGradient(learner,eps,25, sfTarget=0, model_w_new=mdp.model_w, model_w=0.1)
 	mdp = car_conf.ConfDrivingEnv(model_w = mdp.model_w+optimizer.step(g), renderFlag=True)
 	print("NEW MODEL =",mdp.model_w)
 '''

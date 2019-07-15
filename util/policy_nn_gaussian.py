@@ -81,7 +81,7 @@ class nnGaussianPolicy(Policy):
 		log_grad_list = [np.reshape(v,newshape=(-1)) for k,v in log_grad.items()] 
 		return np.concatenate(log_grad_list)
 
-	def estimate_params(self, data, lr, params0=None, nullFeature=None, batchSize=25, epsilon=0.01, minSteps=50, maxSteps=0, printInfo=True):
+	def estimate_params(self, data, lr=0.03, params0=None, nullFeature=None, batchSize=25, epsilon=0.000001, minSteps=50, maxSteps=10000, printInfo=True):
 
 		"""
 		Estimate the parameters of the policy with Maximum Likelihood given a set
@@ -89,7 +89,8 @@ class nnGaussianPolicy(Policy):
 
 		Return when the values stops improving, i.e. ||new_params-params||<epsilon
 		"""
-		N = range(len(data["len"]))
+		N = len(data["len"])
+		Nrange = range(N)
 		optimizer = tf.train.AdamOptimizer(learning_rate=lr,beta1=0.9,beta2=0.999)
 		train_op = optimizer.minimize(loss=self.neg_log_likelihood)
 		if nullFeature is not None:
@@ -98,25 +99,22 @@ class nnGaussianPolicy(Policy):
 		init_op = tf.global_variables_initializer()
 		self.s.run(init_op)
 
-		old_params = self.get_params()
-		if nullFeature is not None:
-			self.s.run(setToZeroOp)
-			'''
-			w = self.params["w1"].eval(self.s)
-			w[nullFeature,:] = 0
-			self.s.run(self.params["w1"].assign(w))
-			'''
-
 		if params0 is not None:
 			self.set_params(params0)
 
+		if nullFeature is not None:
+			self.s.run(setToZeroOp)
+
 		flag = True
 		steps = 0
+		bestParams = np.copy(self.get_params())
+		bestLL = -np.inf
+		avg_update_size = 1
 
 		while flag:
 
 			#grad = np.zeros(shape=self.nParams, dtype=np.float32)
-			batch_indexes = sample(N,batchSize)
+			batch_indexes = sample(Nrange,np.min([batchSize,N]))
 			data_s = np.concatenate([data["s"][ep_n][:data["len"][ep_n]] for ep_n in batch_indexes])
 			data_a = np.concatenate([data["a"][ep_n][:data["len"][ep_n]] for ep_n in batch_indexes])
 
@@ -132,19 +130,25 @@ class nnGaussianPolicy(Policy):
 				w[nullFeature,:] = 0
 				self.s.run(self.params["w1"].assign(w))
 				'''
-			params = self.get_params()
-			update_size = np.linalg.norm(np.ravel(np.asarray(params-old_params)),np.inf)
-			old_params = params
+			
+			if steps%25==0:
+				ll = self.getLogLikelihood(data)
+				if ll>bestLL:
+					bestLL = ll
+					bestParams = np.copy(self.get_params())
+				avg_update_size = 0.1*(ll-bestLL)+0.9*avg_update_size if ll>bestLL else 0.99*avg_update_size
 
-			if printInfo:
-				print(steps," - Update size :",update_size)
+				if printInfo:
+					print(steps,"- ll = ",ll)
+					print("avg_ll_update_size = ",avg_update_size)
+			
 			steps += 1
-			if update_size<epsilon or steps>maxSteps:
+			if avg_update_size<epsilon or steps>maxSteps:
 				flag = False
 			if steps<minSteps:
 				flag = True
 		
-		return params
+		return bestParams
 
 	def compute_log(self, stateFeatures, action):
 		return self.s.run(self.log_policy,feed_dict={
