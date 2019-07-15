@@ -31,10 +31,9 @@ N = 250
 
 eps = collect_car_episodes(mdp,policy,N,mdp.horizon,sfmask=None,render=False,showProgress=True)
 
-estimated_params_0 = policy.estimate_params(eps,nullFeature=0,lr=0.01,batchSize=100)
-ll0 = policy.getLogLikelihood(eps)
-estimated_params_0 = policy.estimate_params(eps,nullFeature=1,lr=0.01,batchSize=100)
-ll1 = policy.getLogLikelihood(eps)
+lrTest(eps,policy,np.array([0,0,1,1,1,1,1,1,1,1,1,1],dtype=np.bool),numResets=5)
+
+'''
 estimated_params = policy.estimate_params(eps,lr=0.01,batchSize=100)
 ll = policy.getLogLikelihood(eps)
 
@@ -43,7 +42,7 @@ lr_lambda_1 = -2*(ll1 - ll)
 print("lr lambda: ",lr_lambda_0,lr_lambda_1)
 x = chi2.ppf(0.99,policy.nHiddenNeurons)
 print("chi2: ",x)
-
+'''
 '''
 optimizer = AdamOptimizer(1, learning_rate=1.0, beta1=0.9, beta2=0.99)
 mdp.model_w += 5

@@ -60,7 +60,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	eps_initial_model = collect_car_episodes(mdp,policy,N,mdp.horizon,sfmask=None,render=False,showProgress=True)
 
 	# Test parameters
-	lr_lambda = lrTest(eps_initial_model,policy,sfTestMask,batchSize=np.int(N/5))
+	lr_lambda = lrTest(eps_initial_model,policy,sfTestMask,batchSize=np.int(N/4),numResets=5)
 	print("REAL AGENT MASK\n",sfMask,flush=True)
 	print("ESTIMATED AGENT MASK\n",sfTestMask,flush=True)
 	print("LR_LAMBDA\n",lr_lambda,flush=True)
