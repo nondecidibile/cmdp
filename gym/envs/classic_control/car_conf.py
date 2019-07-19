@@ -23,13 +23,13 @@ class Car:
 
 		self.sensorDist = 150
 		self.sensors = np.array([
-			[self.sensorDist,np.pi/4],
+			#[self.sensorDist,np.pi/4],
 			[self.sensorDist,np.pi/6],
-			[self.sensorDist,np.pi/12],
+			#[self.sensorDist,np.pi/12],
 			[self.sensorDist,0],
-			[self.sensorDist,-np.pi/12],
+			#[self.sensorDist,-np.pi/12],
 			[self.sensorDist,-np.pi/6],
-			[self.sensorDist,-np.pi/4]
+			#[self.sensorDist,-np.pi/4]
 		],dtype=np.float32)
 		self.sensorValues = np.ones(shape=self.sensors.shape[0],dtype=np.float32)
 	
@@ -242,11 +242,11 @@ class ConfDrivingEnv:
 
 	def _getStateFeatures(self):
 		features = [
-			self.car.speed/self.car.maxSpeed,
-			np.sin(self.car.angle),
-			np.cos(self.car.angle),
-			self.car.pos[0]/self.road.roadWidth,
-			self.car.pos[1]/self.road.segmentSize
+			self.car.speed/self.car.maxSpeed
+			#np.sin(self.car.angle),
+			#np.cos(self.car.angle),
+			#self.car.pos[0]/self.road.roadWidth,
+			#self.car.pos[1]/self.road.segmentSize
 		]
 		state = np.append(self.car.sensorValues,features)
 		return state

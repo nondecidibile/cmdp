@@ -239,28 +239,31 @@ def getModelGradient(superLearner, eps, Neps, sfTarget, model_w_new, model_w):
 	return model_term - d2_term
 
 
-def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.01,batchSize=100,epsilon=0.0001,maxSteps=10000,numResets=3):
+def lrTest(eps,policyInstance,sfMask,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,maxSteps=10000,numResets=3):
 
-	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0))
+	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0)+1)
 
-	#policyInstance.estimate_params(eps,lr,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
-	#ll = policyInstance.getLogLikelihood(eps)
+	policyInstance.estimate_params(eps,lr,nullFeatures=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+	ll_tot = policyInstance.getLogLikelihood(eps)
+	print("ll_tot =",ll_tot)
+	bar.next()
 
 	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
-	ll_tot = np.zeros(shape=(nsf),dtype=np.float32)
+	#ll_tot = np.zeros(shape=(nsf),dtype=np.float32)
 	for feature in range(nsf):
 		if not sfMask[feature]:
 			ll0 = []
-			ll = []
+			#ll = []
 			for _ in range(numResets):
-				params0 = policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
+				params0 = policyInstance.estimate_params(eps,lr,nullFeatures=[feature],batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
 				ll0.append(policyInstance.getLogLikelihood(eps))
-				policyInstance.estimate_params(eps,lr,params0=params0,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
-				ll.append(policyInstance.getLogLikelihood(eps))
+				#policyInstance.estimate_params(eps,lr,params0=params0,nullFeatures=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
+				#ll.append(policyInstance.getLogLikelihood(eps))
 			
 			ll_h0[feature] = np.max(ll0)
-			ll_tot[feature] = np.max(ll)
-			#bar.next()
+			print("ll",feature,"=",ll_h0[feature])
+			#ll_tot[feature] = np.max(ll)
+			bar.next()
 
 	bar.finish()
 

@@ -81,7 +81,7 @@ class nnGaussianPolicy(Policy):
 		log_grad_list = [np.reshape(v,newshape=(-1)) for k,v in log_grad.items()] 
 		return np.concatenate(log_grad_list)
 
-	def estimate_params(self, data, lr=0.03, params0=None, nullFeature=None, batchSize=25, epsilon=0.000001, minSteps=50, maxSteps=10000, printInfo=True):
+	def estimate_params(self, data, lr=0.03, params0=None, nullFeatures=None, lockExcept=None, batchSize=100, epsilon=1e-6, minSteps=50, maxSteps=10000, printInfo=True):
 
 		"""
 		Estimate the parameters of the policy with Maximum Likelihood given a set
@@ -93,8 +93,9 @@ class nnGaussianPolicy(Policy):
 		Nrange = range(N)
 		optimizer = tf.train.AdamOptimizer(learning_rate=lr,beta1=0.9,beta2=0.999)
 		train_op = optimizer.minimize(loss=self.neg_log_likelihood)
-		if nullFeature is not None:
-			setToZeroOp = tf.scatter_update(self.params["w1"],[nullFeature],0)
+
+		if nullFeatures is not None:
+			setToZeroOp = tf.scatter_update(self.params["w1"],nullFeatures,0)
 		
 		init_op = tf.global_variables_initializer()
 		self.s.run(init_op)
@@ -102,8 +103,16 @@ class nnGaussianPolicy(Policy):
 		if params0 is not None:
 			self.set_params(params0)
 
-		if nullFeature is not None:
+		if nullFeatures is not None:
 			self.s.run(setToZeroOp)
+		
+		if lockExcept is not None:
+			lockMask = np.ones(shape=self.nStateFeatures,dtype=np.bool)
+			lockedIndices = np.arange(self.nStateFeatures)
+			lockMask[lockExcept] = False
+			lockedParams = self.s.run(self.params["w1"])
+			resetLockOp = tf.scatter_update(self.params["w1"],lockedIndices[lockMask],lockedParams[lockMask])
+			train_op = optimizer.minimize(loss=self.neg_log_likelihood,var_list=[self.params["w1"]])
 
 		flag = True
 		steps = 0
@@ -123,20 +132,18 @@ class nnGaussianPolicy(Policy):
 				self.action_ph: np.reshape(data_a,newshape=(-1,self.actionDim))
 			})
 			
-			if nullFeature is not None:
+			if nullFeatures is not None:
 				self.s.run(setToZeroOp)
-				'''
-				w = self.params["w1"].eval(self.s)
-				w[nullFeature,:] = 0
-				self.s.run(self.params["w1"].assign(w))
-				'''
+			
+			if lockExcept is not None:
+				self.s.run(resetLockOp)
 			
 			if steps%25==0:
 				ll = self.getLogLikelihood(data)
+				avg_update_size = 0.1*(ll-bestLL)+0.9*avg_update_size if (ll>bestLL and bestLL>-np.inf) else 0.9*avg_update_size
 				if ll>bestLL:
 					bestLL = ll
 					bestParams = np.copy(self.get_params())
-				avg_update_size = 0.1*(ll-bestLL)+0.9*avg_update_size if ll>bestLL else 0.99*avg_update_size
 
 				if printInfo:
 					print(steps,"- ll = ",ll)
