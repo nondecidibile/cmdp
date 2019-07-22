@@ -29,7 +29,7 @@ for experiment in range(NUM_EXPERIMENTS):
 
 	learn(
 		learner = learner,
-		steps = 100, # 100 steps with 25 episodes is ok
+		steps = 50, # 100 steps with 25 episodes is ok
 		#initParams=params,
 		nEpisodes = 25,
 		sfmask=sfMask,
