@@ -20,14 +20,17 @@ class GaussianPolicy(Policy):
 		self.paramsShape = (self.actionDim, self.nStateFeatures)
 		self.params = np.zeros(self.paramsShape)
 
-		self.covarianceMatrix = 0.25 * np.eye(self.actionDim)
+		self.covarianceMatrix = 0.02 ** 2 * np.eye(self.actionDim)
 		self.cov_diag = np.diag(self.covarianceMatrix)
 
 	def draw_action(self, stateFeatures):
 
-		assert(len(stateFeatures)==self.nStateFeatures)
+		#print(stateFeatures)
 
-		mean = np.dot(self.params,stateFeatures)
+		assert(len(stateFeatures)==self.nStateFeatures)
+		mean = np.dot(self.params, stateFeatures)
+		#print(stateFeatures, mean)
+
 		action = np.random.multivariate_normal(mean,self.covarianceMatrix)
 		return action
 
@@ -48,6 +51,9 @@ class GaussianPolicy(Policy):
 			log_gradient[i]*=a
 		return log_gradient
 		'''
+
+		if np.ndim(action) == 1:
+			action = action[:, None]
 
 		mean = np.dot(stateFeatures, self.params.T)
 		ratio = (action - mean) / self.cov_diag[None, :]
