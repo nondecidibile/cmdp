@@ -9,7 +9,7 @@ def build_state_features(state,sfmask=None):
 	x = np.array(state)
 	if sfmask is not None:
 		mask = np.array(sfmask, dtype=bool)
-		x[1-mask] = 0
+		x[mask==0] = 0
 	return x
 
 
@@ -272,7 +272,7 @@ def lrTest(eps,policyInstance,sfMask,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001
 	lr_lambda = -2*(ll_h0 - ll_tot)
 	#print("lr lambda: ",lr_lambda)
 
-	x = chi2.ppf(0.99,policyInstance.nHiddenNeurons)
+	x = chi2.ppf(0.999999,policyInstance.nHiddenNeurons)
 	for param in range(nsf):
 		if lr_lambda[param] > x:
 			sfMask[param] = True
