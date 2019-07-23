@@ -68,6 +68,7 @@ class MiniGolfConf(gym.Env):
         noisy_action = np.clip(noisy_action, self.min_action, self.max_action)
 
         u = noisy_action * self.putter_length
+        u = np.asscalar(u)
 
         v_min = np.sqrt(10 / 7 * self.friction * 9.81 * self.xn)
         v_max = np.sqrt((2*self.hole_size - self.ball_radius)**2*(9.81/(2*self.ball_radius)) + v_min**2)
