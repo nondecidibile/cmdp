@@ -4,23 +4,27 @@ import matplotlib.pyplot as plt
 from util.optimizer import *
 from scipy.stats import chi2
 from tqdm import tqdm
+from util.policy_gaussian import *
 
 
 def build_state_features(state, sfmask=None):
 	x, f = state
 	x = max(0, x)
 	features = np.array([1, x, f, np.sqrt(x), np.sqrt(f), np.sqrt(x * f)])
-	return features[sfmask]
+	if sfmask is not None:
+		return features[sfmask]
+	return features
 
 
-def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,render=False):
+def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,render=False,exportAllStateFeatures=False):
 
-	states = np.zeros(shape=(horizon,policy.nStateFeatures),dtype=np.float32)
-	actions = np.zeros(shape=(horizon,),dtype=np.float32)
+	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or sfmask is None) else len(sfmask)
+	original_states = np.zeros(shape=(horizon,2),dtype=np.float32)
+	states = np.zeros(shape=(horizon,nsf),dtype=np.float32)
+	actions = np.zeros(shape=(horizon,1),dtype=np.float32)
 	rewards = np.zeros(shape=horizon,dtype=np.float32)
 
 	state = mdp.reset()
-	state = build_state_features(state,sfmask)
 	if render:
 		mdp.render()
 
@@ -30,18 +34,18 @@ def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,render=False):
 
 		length += 1
 
-		#print(state)
-		action = policy.draw_action(state)
+		action = policy.draw_action(build_state_features(state,sfmask))
 		newstate, reward, done, _ = mdp.step(action)
 
-		states[i] = state
+		original_states[i] = newstate
+		states[i] = build_state_features(newstate,(None if exportAllStateFeatures else sfmask))
 		actions[i] = action
 		rewards[i] = reward
 
 		if render:
 			mdp.render()
 		
-		state = build_state_features(newstate,sfmask)
+		state = newstate
 
 		if done:
 			break
@@ -49,23 +53,26 @@ def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,render=False):
 	if render:
 		mdp.render()
 	
-	episode_data = {"s": states,"a": actions,"r": rewards}
+	episode_data = {"state": original_states, "s": states,"a": actions,"r": rewards}
 	return [episode_data,length]
 
 
-def collect_minigolf_episodes(mdp,policy,num_episodes,horizon,sfmask=None,render=False,showProgress=False):
+def collect_minigolf_episodes(mdp,policy,num_episodes,horizon,sfmask=None,render=False,showProgress=False,exportAllStateFeatures=False):
 	
-	data_s = np.zeros(shape=(num_episodes,horizon,policy.nStateFeatures),dtype=np.float32)
-	data_a = np.zeros(shape=(num_episodes,horizon,),dtype=np.float32)
+	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or sfmask is None) else len(sfmask)
+	data_states = np.zeros(shape=(num_episodes,horizon,2),dtype=np.float32)
+	data_s = np.zeros(shape=(num_episodes,horizon,nsf),dtype=np.float32)
+	data_a = np.zeros(shape=(num_episodes,horizon,1),dtype=np.float32)
 	data_r = np.zeros(shape=(num_episodes,horizon),dtype=np.float32)
 	data_len = np.zeros(shape=num_episodes, dtype=np.int32)
-	data = {"s": data_s, "a": data_a, "r": data_r, "len": data_len}
+	data = {"state":data_states, "s": data_s, "a": data_a, "r": data_r, "len": data_len}
 
 	if showProgress:
 		bar = Bar('Collecting episodes', max=num_episodes)
 	
 	for i in range(num_episodes):
-		episode_data, length = collect_minigolf_episode(mdp,policy,horizon,sfmask,render)
+		episode_data, length = collect_minigolf_episode(mdp,policy,horizon,sfmask,render,exportAllStateFeatures)
+		data["state"][i] = episode_data["state"]
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
 		data["r"][i] = episode_data["r"]
@@ -171,42 +178,94 @@ def learn(learner, steps, nEpisodes, initParams=None, sfmask=None, learningRate=
 
 def getModelGradient(superLearner, eps, Neps, sfTarget, model_w_new, model_w):
 	
-	raise NotImplementedError
+	N = Neps
+	Tmax = max(eps["len"][:N])
+	n_policy_params = superLearner.policy.nParams
 
+	mdp = superLearner.mdp
+	policy = superLearner.policy
+	gamma = superLearner.gamma
+	states = eps["state"][:N]
+	sf = eps["s"][:N]
+	a = eps["a"][:N]
+	r = eps["r"][:N]
 
-def lrTest(eps,policyInstance,sfMask,nsf=12,na=2,lr=0.01,batchSize=100,epsilon=0.0001,maxSteps=10000,numResets=3):
+	pgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
+	mgradpgrad = np.zeros(shape=(n_policy_params),dtype=np.float32)
 
-	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0))
+	d2 = 0
+	mgrad_d2 = 0
 
-	#policyInstance.estimate_params(eps,lr,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
-	#ll = policyInstance.getLogLikelihood(eps)
+	for n in range(N):
+
+		T = eps["len"][n]
+
+		p_model = mdp.p_model(states[n][1:T],a[0][0:T-1],states[n][0:T-1],model_w)
+		p_model_new = mdp.p_model(states[n][1:T],a[0][0:T-1],states[n][0:T-1],model_w_new)
+		is_ratios = np.insert(np.cumprod(p_model_new / p_model),0,1)
+		if T==1:
+			is_ratios = np.array([1],dtype=np.float32)
+
+		grad_log_p_model = mdp.grad_log_p_model(states[n][1:T],a[0][0:T-1],states[n][0:T-1],model_w_new)
+		model_log_grads = np.insert(np.cumsum(grad_log_p_model),0,0)
+
+		steps = np.arange(T)
+		dr = r[n][0:T]*(gamma**steps)
+
+		policy_log_grad_terms = np.squeeze(policy.compute_log_gradient(sf[n][0:T],a[n][0:T]))
+		policy_log_grads = np.reshape(np.cumsum(policy_log_grad_terms,axis=0),(-1,6))
+
+		mgrad_is_ratios = is_ratios*model_log_grads
+		if T==1:
+			mgrad_is_ratios = np.array([0],dtype=np.float32)
+
+		pgrad += np.dot(dr*is_ratios,policy_log_grads)
+		mgradpgrad += np.dot(dr*is_ratios*mgrad_is_ratios,policy_log_grads)
+
+		gamma_terms = (gamma**steps) * ((gamma**steps)+2*(gamma**(steps+1))+gamma**T)
+		is_d2_terms = is_ratios**2
+		d2 += np.sum(gamma_terms*is_d2_terms)
+		mgrad_d2 += np.sum(2*gamma_terms*is_d2_terms*model_log_grads)
+	
+	pgrad /= N
+	mgradpgrad /= N
+	d2 /= N*(1-gamma)
+	mgrad_d2 /= N*(1-gamma)
+
+	model_term = np.dot(pgrad[sfTarget],mgradpgrad[sfTarget])
+
+	lambda_param = 0.25
+	d2_term = lambda_param/(2*np.sqrt(N))*mgrad_d2/np.sqrt(d2)
+
+	return model_term - d2_term
+
+def lrTest(eps,sfMask,nsf=6,na=1):
+
+	ntest = np.count_nonzero(sfMask==0)
+	bar = Bar('Likelihood ratio tests', max=ntest)
+	super_policy = GaussianPolicy(nStateFeatures=nsf,actionDim=na)
+
+	params = super_policy.estimate_params(eps,setToZero=None)
+	ll = super_policy.getLogLikelihood(eps,params)
 
 	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
-	ll_tot = np.zeros(shape=(nsf),dtype=np.float32)
-	for feature in range(nsf):
-		if not sfMask[feature]:
-			ll0 = []
-			ll = []
-			for _ in range(numResets):
-				params0 = policyInstance.estimate_params(eps,lr,nullFeature=feature,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
-				ll0.append(policyInstance.getLogLikelihood(eps))
-				policyInstance.estimate_params(eps,lr,params0=params0,nullFeature=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
-				ll.append(policyInstance.getLogLikelihood(eps))
-			
-			ll_h0[feature] = np.max(ll0)
-			ll_tot[feature] = np.max(ll)
-			#bar.next()
-
+	for param in range(nsf):
+		if sfMask[param]==False:
+			params_h0 = super_policy.estimate_params(eps,setToZero=param)
+			ll_h0[param] = super_policy.getLogLikelihood(eps,params_h0)
+			bar.next()
+		else:
+			ll_h0[param] = ll # so that we have 0 in the already rejected features
+	
 	bar.finish()
 
-	#print("Log likelihood without i-th feature:",ll_h0)
-	#print("Log likelihood with every feature:  ",ll_tot)
-	lr_lambda = -2*(ll_h0 - ll_tot)
-	#print("lr lambda: ",lr_lambda)
+	#print(ll)
+	#print(ll_h0)
+	lr_lambda = -2*(ll_h0 - ll)
 
-	x = chi2.ppf(0.99,policyInstance.nHiddenNeurons)
+	x = chi2.ppf(0.99,1)
 	for param in range(nsf):
 		if lr_lambda[param] > x:
 			sfMask[param] = True
-
+	
 	return lr_lambda

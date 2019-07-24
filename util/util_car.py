@@ -239,14 +239,16 @@ def getModelGradient(superLearner, eps, Neps, sfTarget, model_w_new, model_w):
 	return model_term - d2_term
 
 
-def lrTest(eps,policyInstance,sfMask,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,maxSteps=10000,numResets=3):
+def lrTest(eps,policyInstance,sfMask,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,maxSteps=10000,numResets=1):
 
-	bar = Bar('Likelihood ratio tests', max=np.count_nonzero(sfMask==0)+1)
+	bar = Bar('Likelihood ratio tests', max=numResets*(np.count_nonzero(sfMask==0)+1))
 
-	policyInstance.estimate_params(eps,lr,nullFeatures=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
-	ll_tot = policyInstance.getLogLikelihood(eps)
-	print("ll_tot =",ll_tot)
-	bar.next()
+	ll_tot_list = []
+	for _ in range(numResets):
+		policyInstance.estimate_params(eps,lr,nullFeatures=None,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps)
+		ll_tot_list.append(policyInstance.getLogLikelihood(eps))
+		bar.next()
+	ll_tot = np.max(ll_tot_list)
 
 	ll_h0 = np.zeros(shape=(nsf),dtype=np.float32)
 	#ll_tot = np.zeros(shape=(nsf),dtype=np.float32)
@@ -261,18 +263,18 @@ def lrTest(eps,policyInstance,sfMask,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001
 				#ll.append(policyInstance.getLogLikelihood(eps))
 			
 			ll_h0[feature] = np.max(ll0)
-			print("ll",feature,"=",ll_h0[feature])
 			#ll_tot[feature] = np.max(ll)
 			bar.next()
 
 	bar.finish()
 
-	#print("Log likelihood without i-th feature:",ll_h0)
-	#print("Log likelihood with every feature:  ",ll_tot)
+	print("[OUT] Log likelihood without i-th feature:",ll_h0)
+	print("[OUT] Log likelihood with every feature:  ",ll_tot)
 	lr_lambda = -2*(ll_h0 - ll_tot)
-	#print("lr lambda: ",lr_lambda)
+	print("[OUT] LR lambda: ",lr_lambda)
 
 	x = chi2.ppf(0.999999,policyInstance.nHiddenNeurons)
+	print("[OUT] chi2 statistic: ",x)
 	for param in range(nsf):
 		if lr_lambda[param] > x:
 			sfMask[param] = True

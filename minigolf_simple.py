@@ -23,10 +23,9 @@ policy.params = params
 
 learner = GpomdpLearner(mdp,policy,gamma=0.99)
 
-
 r = learn(
 	learner = learner,
-	steps = 1000,
+	steps = 0,#1000,
 	initParams=params,
 	nEpisodes = 50,
 	sfmask=sfMask,
@@ -34,3 +33,19 @@ r = learn(
 	plotGradient = False,
 	printInfo = True
 )
+
+N = 100
+eps = collect_minigolf_episodes(mdp,policy,N,mdp.horizon,sfmask=sfMask,showProgress=True,exportAllStateFeatures=True)
+lrlambda = lrTest(eps,np.array([1,0,0,0,0,0]))
+
+super_policy = GaussianPolicy(nStateFeatures=6,actionDim=1)
+super_policy.covarianceMatrix = 0.01 ** 2 * np.eye(1)
+super_learner = GpomdpLearner(mdp,super_policy,gamma=0.99)
+
+model_w = 6.0
+model_w_new = 6.01
+optimizer = AdamOptimizer(1,learning_rate=0.001)
+for conf_index in range(100):
+	g = getModelGradient(super_learner,eps,N,sfTarget=0,model_w_new=model_w_new,model_w=model_w)
+	model_w_new += optimizer.step(g)
+	print("g =",g,"- model_w_new =",model_w_new)

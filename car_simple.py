@@ -55,7 +55,7 @@ for experiment in range(NUM_EXPERIMENTS):
 		batchSize=N,
 		epsilon=0.001,
 		maxSteps=25000,
-		numResets=1
+		numResets=3
 	)
 
 	print("REAL AGENT MASK",sfMask)
