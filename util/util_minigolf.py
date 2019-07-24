@@ -16,7 +16,7 @@ def build_state_features(state, sfmask=None):
 	return features
 
 
-def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,render=False,exportAllStateFeatures=False):
+def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,exportAllStateFeatures=False):
 
 	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or sfmask is None) else len(sfmask)
 	original_states = np.zeros(shape=(horizon,2),dtype=np.float32)
@@ -25,9 +25,6 @@ def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,render=False,exportA
 	rewards = np.zeros(shape=horizon,dtype=np.float32)
 
 	state = mdp.reset()
-	if render:
-		mdp.render()
-
 	length = 0
 
 	for i in range(horizon):
@@ -37,27 +34,21 @@ def collect_minigolf_episode(mdp,policy,horizon,sfmask=None,render=False,exportA
 		action = policy.draw_action(build_state_features(state,sfmask))
 		newstate, reward, done, _ = mdp.step(action)
 
-		original_states[i] = newstate
-		states[i] = build_state_features(newstate,(None if exportAllStateFeatures else sfmask))
+		original_states[i] = state
+		states[i] = build_state_features(state,(None if exportAllStateFeatures else sfmask))
 		actions[i] = action
 		rewards[i] = reward
-
-		if render:
-			mdp.render()
 		
 		state = newstate
 
 		if done:
 			break
 	
-	if render:
-		mdp.render()
-	
 	episode_data = {"state": original_states, "s": states,"a": actions,"r": rewards}
 	return [episode_data,length]
 
 
-def collect_minigolf_episodes(mdp,policy,num_episodes,horizon,sfmask=None,render=False,showProgress=False,exportAllStateFeatures=False):
+def collect_minigolf_episodes(mdp,policy,num_episodes,horizon,sfmask=None,showProgress=False,exportAllStateFeatures=False):
 	
 	nsf = policy.nStateFeatures if (exportAllStateFeatures is False or sfmask is None) else len(sfmask)
 	data_states = np.zeros(shape=(num_episodes,horizon,2),dtype=np.float32)
@@ -71,7 +62,7 @@ def collect_minigolf_episodes(mdp,policy,num_episodes,horizon,sfmask=None,render
 		bar = Bar('Collecting episodes', max=num_episodes)
 	
 	for i in range(num_episodes):
-		episode_data, length = collect_minigolf_episode(mdp,policy,horizon,sfmask,render,exportAllStateFeatures)
+		episode_data, length = collect_minigolf_episode(mdp,policy,horizon,sfmask,exportAllStateFeatures)
 		data["state"][i] = episode_data["state"]
 		data["s"][i] = episode_data["s"]
 		data["a"][i] = episode_data["a"]
@@ -117,7 +108,7 @@ def learn(learner, steps, nEpisodes, initParams=None, sfmask=None, learningRate=
 	for step in tqdm(range(steps)):
 		#print(step)
 
-		eps = collect_minigolf_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,sfmask,render=False)
+		eps = collect_minigolf_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,sfmask)
 		#print(eps['r'])
 
 		gradient = learner.estimate_gradient(eps)
@@ -171,7 +162,8 @@ def learn(learner, steps, nEpisodes, initParams=None, sfmask=None, learningRate=
 		#policy.print_params()
 		if step>0 and step%5==0:
 			if False:
-				collect_minigolf_episode(learner.mdp,learner.policy,learner.mdp.horizon,sfmask=sfmask,render=True)
+				ep = collect_minigolf_episode(learner.mdp,learner.policy,learner.mdp.horizon,sfmask=sfmask)
+				print(ep[0]["state"][:ep[1]],ep[0]["a"][:ep[1]],ep[0]["r"][:ep[1]])
 
 	return best
 

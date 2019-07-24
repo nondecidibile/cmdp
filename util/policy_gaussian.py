@@ -22,6 +22,9 @@ class GaussianPolicy(Policy):
 
 		self.covarianceMatrix = 0.02 ** 2 * np.eye(self.actionDim)
 		self.cov_diag = np.diag(self.covarianceMatrix)
+	
+	def init_random_params(self, stddev=1.0):
+		self.params = stddev*np.random.rand(self.actionDim, self.nStateFeatures)
 
 	def draw_action(self, stateFeatures):
 

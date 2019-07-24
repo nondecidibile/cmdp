@@ -11,9 +11,13 @@ NUM_EXPERIMENTS = 25
 type1err_tot = 0
 type2err_tot = 0
 
-MDP_HORIZON = 50
 LEARNING_STEPS = 1000
-LEARNING_EPISODES = 50
+LEARNING_EPISODES = 100
+LEARNING_RATE = 0.001
+STDDEV_INIT_PARAMS = 0.1
+GAMMA = 0.95 # mdp horizon = 20
+
+POLICY_VARIANCE = 0.01 ** 2
 
 CONFIGURATION_STEPS = 100
 MAX_NUM_TRIALS = 3
@@ -27,6 +31,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	sfMask = np.random.choice(a=[False, True], size=(6), p=[0.5, 0.5])
 	sfMask[0] = True # constant term
 	sfMask = np.array(sfMask,dtype=np.bool)
+	print("Using sfMask =",sfMask)
 
 	sfTestMask = np.zeros(shape=6,dtype=np.bool) # State features rejected (we think the agent have)
 	sfTestMask[0] = True
@@ -43,7 +48,9 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	mdp.sigma_noise = 0.01
 
 	agent_policy_initial_model = GaussianPolicy(nStateFeatures=np.sum(sfMask),actionDim=1)
-	agent_learner_initial_model = GpomdpLearner(mdp,agent_policy_initial_model,gamma=0.99)
+	agent_policy_initial_model.covarianceMatrix = POLICY_VARIANCE * np.eye(1)
+	agent_policy_initial_model.init_random_params(stddev=STDDEV_INIT_PARAMS)
+	agent_learner_initial_model = GpomdpLearner(mdp,agent_policy_initial_model,gamma=GAMMA)
 
 	r = learn(
 		learner = agent_learner_initial_model,
@@ -51,13 +58,14 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		#initParams=params,
 		nEpisodes = LEARNING_EPISODES,
 		sfmask=sfMask,
-		learningRate = 0.001,
-		plotGradient = False,
+		learningRate = LEARNING_RATE,
+		plotGradient = True,
 		printInfo = True
 	)
 
 	super_policy_initial_model = GaussianPolicy(nStateFeatures=6,actionDim=1)
-	super_learner_initial_model = GpomdpLearner(mdp,super_policy_initial_model,gamma=0.99)
+	super_policy_initial_model.covarianceMatrix = POLICY_VARIANCE * np.eye(1)
+	super_learner_initial_model = GpomdpLearner(mdp,super_policy_initial_model,gamma=GAMMA)
 
 	eps_initial_model = collect_minigolf_episodes(mdp,agent_policy_initial_model,N,mdp.horizon,sfmask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
@@ -111,7 +119,9 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		mdp.sigma_noise = 0.01
 
 		agent_policy = GaussianPolicy(nStateFeatures=np.sum(sfMask),actionDim=1)
-		agent_learner = GpomdpLearner(mdp,agent_policy,gamma=0.99)
+		agent_policy.covarianceMatrix = POLICY_VARIANCE * np.eye(1)
+		agent_policy.init_random_params(stddev=STDDEV_INIT_PARAMS)
+		agent_learner = GpomdpLearner(mdp,agent_policy,gamma=GAMMA)
 
 		r = learn(
 			learner = agent_learner,
@@ -119,13 +129,14 @@ for experiment_i in range(NUM_EXPERIMENTS):
 			#initParams=params,
 			nEpisodes = LEARNING_EPISODES,
 			sfmask=sfMask,
-			learningRate = 0.001,
+			learningRate = LEARNING_RATE,
 			plotGradient = False,
 			printInfo = True
 		)
 
 		super_policy = GaussianPolicy(nStateFeatures=6,actionDim=1)
-		super_learner = GpomdpLearner(mdp,super_policy,gamma=0.99)
+		super_policy.covarianceMatrix = POLICY_VARIANCE * np.eye(1)
+		super_learner = GpomdpLearner(mdp,super_policy,gamma=GAMMA)
 
 		eps = collect_minigolf_episodes(mdp,agent_policy_initial_model,N,mdp.horizon,sfmask=sfMask,showProgress=True,exportAllStateFeatures=True)
 
