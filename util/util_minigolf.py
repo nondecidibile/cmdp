@@ -171,7 +171,6 @@ def learn(learner, steps, nEpisodes, initParams=None, sfmask=None, learningRate=
 def getModelGradient(superLearner, eps, Neps, sfTarget, model_w_new, model_w):
 	
 	N = Neps
-	Tmax = max(eps["len"][:N])
 	n_policy_params = superLearner.policy.nParams
 
 	mdp = superLearner.mdp
@@ -194,7 +193,7 @@ def getModelGradient(superLearner, eps, Neps, sfTarget, model_w_new, model_w):
 
 		p_model = mdp.p_model(states[n][1:T],a[0][0:T-1],states[n][0:T-1],model_w)
 		p_model_new = mdp.p_model(states[n][1:T],a[0][0:T-1],states[n][0:T-1],model_w_new)
-		is_ratios = np.insert(np.cumprod(p_model_new / p_model),0,1)
+		is_ratios = np.insert(np.cumprod(p_model_new / (p_model+1e-09)),0,1)
 		if T==1:
 			is_ratios = np.array([1],dtype=np.float32)
 

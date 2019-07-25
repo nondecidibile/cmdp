@@ -59,8 +59,8 @@ for experiment_i in range(NUM_EXPERIMENTS):
 		nEpisodes = LEARNING_EPISODES,
 		sfmask=sfMask,
 		learningRate = LEARNING_RATE,
-		plotGradient = True,
-		printInfo = True
+		plotGradient = False,
+		printInfo = False
 	)
 
 	super_policy_initial_model = GaussianPolicy(nStateFeatures=6,actionDim=1)
@@ -77,7 +77,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 	#
 	# Cycle ENVIRONMENT CONFIGURATION
 	#
-	model_w = None
+	model_w = 0
 	eps = None
 	super_learner = None
 	for conf_index in range(1,10000):
@@ -92,7 +92,7 @@ for experiment_i in range(NUM_EXPERIMENTS):
 			if sfTestTrials[i] < MAX_NUM_TRIALS:
 				nextIndex = i
 				if(sfTestTrials[i]==0):
-					model_w = initial_model_w.copy()
+					model_w = initial_model_w
 					eps = eps_initial_model
 					super_learner = super_learner_initial_model
 				sfTestTrials[i] += 1
@@ -102,16 +102,15 @@ for experiment_i in range(NUM_EXPERIMENTS):
 			break
 		print("Iteration",conf_index,"\nConfiguring model to test parameter",nextIndex,flush=True)
 
-		model_w_2 = model_w.copy()
-		model_w_2 += 0.001
+		model_w_2 = model_w
+		model_w_2 += 0.0001
 
 		modelOptimizer = AdamOptimizer(shape=1,learning_rate=0.0001)
 		for _i in range(CONFIGURATION_STEPS):
 			modelGradient = getModelGradient(super_learner,eps,N,sfTarget=nextIndex,model_w_new=model_w_2, model_w=model_w)
-			model_w_2 += modelOptimizer.step(modelGradient)
+			model_w_2 += modelOptimizer.step(np.clip(modelGradient,-1e+09,1e+09))
 		
-		model_w = model_w_2.copy()
-
+		model_w = model_w_2
 		print("Using MDP with param =",model_w,flush=True)
 
 		mdp = minigolf.MiniGolfConf()

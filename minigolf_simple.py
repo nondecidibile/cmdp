@@ -43,9 +43,9 @@ super_policy.covarianceMatrix = 0.01 ** 2 * np.eye(1)
 super_learner = GpomdpLearner(mdp,super_policy,gamma=0.99)
 
 model_w = 6.0
-model_w_new = 6.01
+model_w_new = 6.001
 optimizer = AdamOptimizer(1,learning_rate=0.001)
 for conf_index in range(100):
 	g = getModelGradient(super_learner,eps,N,sfTarget=0,model_w_new=model_w_new,model_w=model_w)
-	model_w_new += optimizer.step(g)
+	model_w_new += optimizer.step(np.clip(g,-1e+09,1e+09))
 	print("g =",g,"- model_w_new =",model_w_new)
