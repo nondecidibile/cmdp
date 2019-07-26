@@ -77,7 +77,7 @@ def collect_minigolf_episodes(mdp,policy,num_episodes,horizon,sfmask=None,showPr
 	return data
 
 
-def learn(learner, steps, nEpisodes, initParams=None, sfmask=None, learningRate=0.1, plotGradient=False, printInfo=False):
+def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient=False, printInfo=False):
 	
 	if steps<=0 or steps is None:
 		plotGradient = False
