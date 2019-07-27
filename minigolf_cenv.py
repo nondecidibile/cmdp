@@ -7,7 +7,7 @@ from util.optimizer import *
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-sfMask = np.array([1,1,1,1,1,1], dtype=np.bool)
+sfMask = np.array([1,1,0,1,0,0], dtype=np.bool)
 
 range_size = 17
 putter_lengths = np.linspace(2,10,range_size)
@@ -29,6 +29,8 @@ for exp_i in range(range_size):
 	policy.covarianceMatrix = 0.01 ** 2 * np.eye(1)
 	#policy.init_random_params(stddev=0.1)
 
+	'''
+	### sfmask = [1,1,1,1,1,1]
 	if mdp.putter_length<=3:
 		policy.params = np.array([[0.229612, 0.026594, 0.559805, 0.052526, 0.468982, 0.332139]]) # 3
 	elif mdp.putter_length<=4:
@@ -45,6 +47,25 @@ for exp_i in range(range_size):
 		policy.params = np.array([[-0.027855, -0.020536, 0.053943, 0.000836, 0.094026, 0.450082]]) # 9
 	else:
 		policy.params = np.array([[-0.036755, -0.029334, 0.050084, -0.005624, 0.087806, 0.444036]]) # 10
+	'''
+
+	### sfmask = [1,1,0,1,0,0]
+	if mdp.putter_length<=3:
+		policy.params = np.array([[ 0.59512 , -0.014119,  0.177242]]) # 3
+	elif mdp.putter_length<=4:
+		policy.params = np.array([[ 0.555276, -0.034758,  0.145481]]) # 4
+	elif mdp.putter_length<=5:
+		policy.params = np.array([[ 0.498033, -0.057134,  0.112843]]) # 5
+	elif mdp.putter_length<=6:
+		policy.params = np.array([[ 0.422331, -0.072032,  0.063236]]) # 6
+	elif mdp.putter_length<=7:
+		policy.params = np.array([[ 0.345271, -0.096612,  0.032056]]) # 7
+	elif mdp.putter_length<=8:
+		policy.params = np.array([[ 0.316851, -0.127784,  0.001059]]) # 8
+	elif mdp.putter_length<=9:
+		policy.params = np.array([[ 0.281807, -0.124369,  0.014284]]) # 9
+	else:
+		policy.params = np.array([[ 0.244056, -0.11538 ,  0.015796]]) # 10
 
 	learner = GpomdpLearner(mdp,policy,gamma=0.95)
 

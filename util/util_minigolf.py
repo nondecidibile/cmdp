@@ -114,7 +114,7 @@ def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient
 		gradient = learner.estimate_gradient(eps)
 		update_step = optimizer.step(gradient)
 
-		#print(learner.policy.params)
+		print(repr(learner.policy.params))
 
 		learner.policy.params += update_step
 
