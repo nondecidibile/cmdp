@@ -105,7 +105,7 @@ def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient
 
 	best = -np.inf
 
-	for step in tqdm(range(steps)):
+	for step in (tqdm(range(steps)) if printInfo else range(steps)):
 		#print(step)
 
 		eps = collect_minigolf_episodes(learner.mdp,learner.policy,nEpisodes,learner.mdp.horizon,sfmask)
@@ -117,7 +117,6 @@ def learn(learner, steps, nEpisodes, sfmask=None, learningRate=0.1, plotGradient
 		#print(learner.policy.params)
 
 		learner.policy.params += update_step
-
 
 
 		mean_length = np.mean(eps["len"])
