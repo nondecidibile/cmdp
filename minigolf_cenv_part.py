@@ -7,7 +7,7 @@ from util.optimizer import *
 np.set_printoptions(precision=6)
 np.set_printoptions(suppress=True)
 
-sfMask = np.array([1,1,1,1,1,1], dtype=np.bool)
+sfMask = np.array([1,1,0,1,0,0], dtype=np.bool)
 
 '''
 range_size = 17
@@ -19,7 +19,7 @@ LEARNING_STEPS = 0
 LEARNING_EPS = 1000
 LEARNING_RATE = 0.001
 
-N = 25000
+N = 10000
 
 
 #for exp_i in range(range_size):
@@ -32,7 +32,7 @@ mdp.sigma_noise = 0.01
 policy = GaussianPolicy(nStateFeatures=np.sum(sfMask),actionDim=1)
 policy.covarianceMatrix = 0.01 ** 2 * np.eye(1)
 #policy.init_random_params(stddev=0.1)
-policy.params = np.array([[0.241585, 0.006281, 0.606685, 0.169091, 0.590773, 0.884413]])
+policy.params = np.array([[1.145619, 0.025101, 0.319547]])
 
 learner = GpomdpLearner(mdp,policy,gamma=0.95)
 #print("\nPutter length: ",putter_lengths[exp_i],flush=True)
