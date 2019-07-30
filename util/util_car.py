@@ -280,3 +280,62 @@ def lrTest(eps,policyInstance,sfMask,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001
 			sfMask[param] = True
 
 	return lr_lambda
+
+def lrCombTest(eps,policyInstance,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,maxSteps=10000):
+
+	bar = Bar('Likelihood ratio tests', max=2**nsf)
+
+	ll = np.zeros(shape=(2**nsf),dtype=np.float32)
+	for f in range(2**nsf-1):
+		if f>0:
+			mask = np.base_repr(f,padding=nsf)
+			mask = [int(i) for i in mask[-nsf:]]
+			null_features = np.array(np.where(mask))
+		else:
+			null_features = None
+		print(null_features)
+		params = policyInstance.estimate_params(eps,lr,nullFeatures=null_features,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
+		ll[f] = policyInstance.getLogLikelihood(eps)
+		bar.next()
+
+	bar.finish()
+
+	print(ll)
+
+	ll_tot = ll[0]
+	ll_part = ll[1:2**nsf-1]
+	lr_lambda = -2*(ll_part - ll_tot)
+
+	print("[DEBUG] ll_tot:    ",ll_tot)
+	print("[DEBUG] ll_part:   ",ll_part)
+	print("[OUT] LR lambda: ",lr_lambda)
+
+	sfCombMask = np.zeros(shape=2**nsf-2,dtype=np.bool)
+
+	subsets = []
+
+	for i in range(2**nsf-2):
+		mask = np.base_repr(i+1,padding=nsf)
+		mask = np.array([int(j) for j in mask[-nsf:]],dtype=np.bool)
+
+		nullFeaturesWeight = np.sum(mask)
+		subsetWeight = nsf - nullFeaturesWeight
+
+		x = chi2.ppf(0.99,nullFeaturesWeight*policyInstance.nHiddenNeurons)
+		if lr_lambda[i]>x:
+			sfCombMask[i] = True
+		else:
+			ok = True
+			for j in range(2**nsf-2):
+				mask_j = np.base_repr(j+1,padding=nsf)
+				mask_j = np.array([int(k) for k in mask_j[-nsf:]],dtype=np.bool)
+				nullFeaturesWeight_j = np.sum(mask_j)
+				subsetWeight_j = nsf - nullFeaturesWeight_j
+				if subsetWeight_j==subsetWeight-1 and np.sum(mask_j[mask==True])==nullFeaturesWeight:
+					y = chi2.ppf(0.99,nullFeaturesWeight*policyInstance.nHiddenNeurons)
+					if lr_lambda[j]<y:
+						ok = False
+			if ok:
+				subsets.append(1-mask)
+
+	return subsets

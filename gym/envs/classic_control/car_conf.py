@@ -23,13 +23,13 @@ class Car:
 
 		self.sensorDist = 150
 		self.sensors = np.array([
-			#[self.sensorDist,np.pi/4],
+			[self.sensorDist,np.pi/4],
 			[self.sensorDist,np.pi/6],
 			#[self.sensorDist,np.pi/12],
-			[self.sensorDist,0],
+			#[self.sensorDist,0],
 			#[self.sensorDist,-np.pi/12],
 			[self.sensorDist,-np.pi/6],
-			#[self.sensorDist,-np.pi/4]
+			[self.sensorDist,-np.pi/4]
 		],dtype=np.float32)
 		self.sensorValues = np.ones(shape=self.sensors.shape[0],dtype=np.float32)
 	
