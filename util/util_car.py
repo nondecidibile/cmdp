@@ -268,13 +268,13 @@ def lrTest(eps,policyInstance,sfMask,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001
 
 	bar.finish()
 
-	print("[OUT] Log likelihood without i-th feature:",ll_h0)
-	print("[OUT] Log likelihood with every feature:  ",ll_tot)
+	print("[DEBUG] Log likelihood without i-th feature:",ll_h0)
+	print("[DEBUG] Log likelihood with every feature:  ",ll_tot)
 	lr_lambda = -2*(ll_h0 - ll_tot)
-	print("[OUT] LR lambda: ",lr_lambda)
+	print("[DEBUG] LR lambda: ",lr_lambda)
 
-	x = chi2.ppf(0.999999,policyInstance.nHiddenNeurons)
-	print("[OUT] chi2 statistic: ",x)
+	x = chi2.ppf(0.99,policyInstance.nHiddenNeurons)
+	print("[DEBUG] chi2 statistic: ",x)
 	for param in range(nsf):
 		if lr_lambda[param] > x:
 			sfMask[param] = True
@@ -293,8 +293,7 @@ def lrCombTest(eps,policyInstance,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,ma
 			null_features = np.array(np.where(mask))
 		else:
 			null_features = None
-		print(null_features)
-		params = policyInstance.estimate_params(eps,lr,nullFeatures=null_features,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=False)
+		params = policyInstance.estimate_params(eps,lr,nullFeatures=null_features,batchSize=batchSize,epsilon=epsilon,maxSteps=maxSteps,printInfo=True)
 		ll[f] = policyInstance.getLogLikelihood(eps)
 		bar.next()
 
@@ -308,11 +307,13 @@ def lrCombTest(eps,policyInstance,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,ma
 
 	print("[DEBUG] ll_tot:    ",ll_tot)
 	print("[DEBUG] ll_part:   ",ll_part)
-	print("[OUT] LR lambda: ",lr_lambda)
+	print("[DEBUG] LR lambda: ",lr_lambda)
 
 	sfCombMask = np.zeros(shape=2**nsf-2,dtype=np.bool)
+	sfLinMask = np.zeros(shape=nsf,dtype=np.bool)
 
 	subsets = []
+	#subsets_params = []
 
 	for i in range(2**nsf-2):
 		mask = np.base_repr(i+1,padding=nsf)
@@ -324,6 +325,9 @@ def lrCombTest(eps,policyInstance,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,ma
 		x = chi2.ppf(0.99,nullFeaturesWeight*policyInstance.nHiddenNeurons)
 		if lr_lambda[i]>x:
 			sfCombMask[i] = True
+			if nullFeaturesWeight==1:
+				index = np.where(mask==True)
+				sfLinMask[index] = True
 		else:
 			ok = True
 			for j in range(2**nsf-2):
@@ -337,5 +341,6 @@ def lrCombTest(eps,policyInstance,nsf,na,lr=0.01,batchSize=100,epsilon=0.0001,ma
 						ok = False
 			if ok:
 				subsets.append(1-mask)
+				#subsets_params.append()
 
-	return subsets
+	return [subsets,sfLinMask]

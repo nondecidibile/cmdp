@@ -2,6 +2,7 @@ import numpy as np
 from util.policy import Policy
 import tensorflow as tf
 from random import sample 
+from scipy.stats import multivariate_normal
 
 
 class nnGaussianPolicy(Policy):
@@ -174,6 +175,33 @@ class nnGaussianPolicy(Policy):
 			log_likelihood += np.sum(self.compute_log(eps_s[n,:T],eps_a[n,:T]))
 		
 		return log_likelihood
+	
+	def getKlDivergence(self, data, paramsP, paramsQ):
+		eps_s = data["s"]
+		eps_a = data["a"]
+		eps_len = data["len"]
+
+		N = eps_len.size
+		Tmax = np.max(eps_len)
+
+		px = np.zeros(shape=(N,Tmax),dtype=np.float32)
+		logpx = np.zeros(shape=(N,Tmax),dtype=np.float32)
+		logqx = np.zeros(shape=(N,Tmax),dtype=np.float32)
+
+		self.set_params(paramsP)
+		for n,T in enumerate(eps_len):
+			logpx[n] = self.compute_log(eps_s[n,:T],eps_a[n,:T])
+			sf = np.reshape(eps_s[n],[-1,self.nStateFeatures])
+			a = np.reshape(eps_a[n],[-1,self.actionDim])
+			output = self.s.run(self.outputLayer,feed_dict={self.inputLayer:sf})
+			#for t in range(eps_len[n]):
+			#	px[n,t] = multivariate_normal.pdf(a[t], mean=output[t], cov=self.covariance)
+				
+		self.set_params(paramsQ)
+		for n,T in enumerate(eps_len):
+			logqx[n] = self.compute_log(eps_s[n,:T],eps_a[n,:T])
+		
+		return np.sum(logpx-logqx)
 	
 	def set_params(self, params):
 		new_params = tf.split(params,tf.stack(self.var_params))
